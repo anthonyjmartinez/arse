@@ -1,0 +1,10 @@
+[creds]
+user = "caty"
+password = "123456"
+
+[logging]
+level = "INFO"
+
+[docpaths]
+templates = "/var/www/blog/templates"
+topics = "/var/www/blog/topics"
