@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::io::prelude::*;
 use std::path::Path;
 
 use clap::{App, AppSettings, Arg, ArgMatches, SubCommand, Values};
@@ -25,7 +25,13 @@ fn args() -> App<'static, 'static> {
 			 .takes_value(true)
 			 .index(1)))
 	.subcommand(SubCommand::with_name("new")
-		    .about("Generates a base directory structure for a new blog")
+		    .about("Generates a base directory structure and configuration file for a new blog")
+		    .arg(Arg::with_name("username")
+			 .help("Provides the username for the blog's admin")
+			 .required(true)
+			 .takes_value(true)
+			 .short("u")
+			 .long("user"))
 		    .arg(Arg::with_name("topics")
 			 .help("Provides the list of topics for the generator.")
 			 .required(true)
@@ -35,7 +41,7 @@ fn args() -> App<'static, 'static> {
 			 .min_values(1)))
 }
 
-pub fn load_config() -> Result<Config, Box<dyn std::error::Error>> {
+pub fn load() -> Result<Config, Box<dyn std::error::Error>> {
     let matches = args().get_matches();
     let config: Result<Config, Box<dyn std::error::Error>>;
     if matches.is_present("run") {
@@ -52,13 +58,9 @@ pub fn load_config() -> Result<Config, Box<dyn std::error::Error>> {
 
 fn runner_config(m: ArgMatches) -> Result<Config, Box<dyn std::error::Error>> {
     if let Some(run) = m.subcommand_matches("run") {
-	if let Some(value) = run.value_of("config") {
-	    let config = AppConfig::new(value)?;
-	    Ok(Config::Main(config))
-	} else {
-	    let msg = format!("Failed to load configuration");
-	    Err(From::from(msg))
-	}
+	let value = run.value_of("config").unwrap();
+	let config = AppConfig::new(value)?;
+	Ok(Config::Main(config))
     } else {
 	let msg = format!("Failed to read arguments for 'run' subcommand");
 	Err(From::from(msg))
@@ -67,26 +69,46 @@ fn runner_config(m: ArgMatches) -> Result<Config, Box<dyn std::error::Error>> {
 
 fn init_config(m: ArgMatches) -> Result<Config, Box<dyn std::error::Error>> {
     if let Some(new) = m.subcommand_matches("new") {
-	if let Some(values) = new.values_of("topics") {
-	    let config = BuildConfig::new(values)?;
-	    Ok(Config::New(config))
-	} else {
-	    let msg = format!("Failed to load configuration");
-	    Err(From::from(msg))
-	}
+	let username = new.value_of("username").unwrap();
+	let topic_values = new.values_of("topics").unwrap();
+	let config = BuildConfig::new(&username, topic_values)?;
+	Ok(Config::New(config))
     } else {
 	let msg = format!("Failed to read arguments for 'new' subcommand");
 	Err(From::from(msg))
     }
 }
 
-type Dict = HashMap<String, String>;
+#[derive(Debug, Deserialize)]
+pub struct Blog {
+    name: String,
+    author: String,
+    topics: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct Credentials {
+    user: String,
+    password: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct DocPaths {
+    templates: String,
+    webroot: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct LogConfig {
+    level: String
+}
 
 #[derive(Debug, Deserialize)]
 pub struct AppConfig {
-    creds: Dict,
-    logging: Dict,
-    docpaths: Dict,
+    blog: Blog,
+    creds: Credentials,
+    logging: LogConfig,
+    docpaths: DocPaths,
 }
 
 impl AppConfig {
@@ -100,13 +122,20 @@ impl AppConfig {
 
 #[derive(Debug, Deserialize)]
 pub struct BuildConfig {
+    username: String,
     topics: Vec<String>
 }
 
 impl BuildConfig {
-    pub fn new(values: Values) -> Result<BuildConfig, Box<dyn std::error::Error>> {
-	let topics: Vec<String> = values.map(|x| String::from(x)).collect();
-	Ok(BuildConfig { topics } )
+    pub fn new(username: &str, topic_values: Values) -> Result<BuildConfig, Box<dyn std::error::Error>> {
+	let username = username.to_string();
+	let topics: Vec<String> = topic_values.map(|x| String::from(x)).collect();
+	Ok(BuildConfig { username, topics } )
+    }
+
+    pub fn to_app_config<R: BufRead>(&self, src: R) -> Result<AppConfig, Box<dyn std::error::Error>> {
+	
+	Err(From::from("just working on bits"))
     }
 }
 
@@ -125,11 +154,30 @@ mod tests{
 
     #[test]
     fn build_new_config() {
-	let arg_vec = vec!["caty-blog", "new", "-t", "yoga", "cooking"];
+	let arg_vec = vec!["caty-blog", "new", "-u", "caty",
+			   "-t", "yoga", "cooking"];
 	let matches = args().get_matches_from(arg_vec);
 	let config = init_config(matches);
 	assert!(config.is_ok());
 	let config = config.unwrap();
 	assert!(matches!(config, Config::New(_)));
+    }
+
+    #[test]
+    // Fix this test to provide input for each "prompt" for information
+    fn generate_blog_config() {
+	let src: &[u8] = b"MagicPassword";
+	let arg_vec = vec!["caty-blog", "new", "-u", "caty",
+			   "-t", "yoga", "cooking"];
+	let matches = args().get_matches_from(arg_vec);
+	if let Ok(build_config) = init_config(matches) {
+	    match build_config {
+		Config::New(bc) => {
+		    assert!(bc.to_app_config(src).is_ok())
+		},
+		_ => ()
+	    }
+	    
+	}
     }
 }

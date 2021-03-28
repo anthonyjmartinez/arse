@@ -1,5 +1,10 @@
+[blog]
+name = "My Awesome Blog!"
+author = "Neo"
+topics = ["one", "two", "three"]
+
 [creds]
-user = "caty"
+user = "admin"
 password = "123456"
 
 [logging]
@@ -7,4 +12,4 @@ level = "INFO"
 
 [docpaths]
 templates = "/var/www/blog/templates"
-topics = "/var/www/blog/topics"
+webroot = "/var/www/blog/webroot"

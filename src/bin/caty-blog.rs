@@ -2,7 +2,7 @@ use caty_blog::*;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let config = config::load_config()?;
+    let config = config::load()?;
     println!("{:?}", config);
 
     // Configure logging
