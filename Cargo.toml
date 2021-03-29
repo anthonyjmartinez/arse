@@ -10,6 +10,7 @@ edition = "2018"
 clap = "2.33.3"
 tera = "1.7.0"
 pulldown-cmark = { version = "0.8", default-features = false, features = ["simd"] }
+rand = "0.8"
 serde = { version = "1", features = ["derive"] }
 tokio = { version = "1", features = ["full"] }
 toml = "0.5"
