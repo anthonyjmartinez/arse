@@ -8,6 +8,7 @@ edition = "2018"
 
 [dependencies]
 clap = "2.33.3"
+data-encoding = "2.3.2"
 tera = "1.7.0"
 pulldown-cmark = { version = "0.8", default-features = false, features = ["simd"] }
 rand = "0.8"

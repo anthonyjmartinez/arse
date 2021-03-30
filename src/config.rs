@@ -1,3 +1,4 @@
+use std::fs::{create_dir_all, File, OpenOptions};
 use std::{io::BufRead, usize};
 use std::path::Path;
 
@@ -33,7 +34,9 @@ pub fn load() -> Result<AppConfig, Box<dyn std::error::Error>> {
     if matches.is_present("run") {
 	config = runner_config(matches);
     } else if matches.is_present("new") {
-	config = init_config();
+	let reader = std::io::stdin();
+	let mut reader = reader.lock();
+	config = AppConfig::generate(&mut reader);
     } else {
 	let msg = format!("Unable to load configuration");
 	config = Err(From::from(msg));
@@ -53,11 +56,25 @@ fn runner_config(m: ArgMatches) -> Result<AppConfig, Box<dyn std::error::Error>>
     }
 }
 
-fn init_config() -> Result<AppConfig, Box<dyn std::error::Error>> {
-    let reader = std::io::stdin();
-    let mut reader = reader.lock();
-    let config = AppConfig::generate(&mut reader)?;
-    Ok(config)
+fn get_input<R: BufRead>(prompt: &str, reader: &mut R) -> Result<String, Box<dyn std::error::Error>> {
+    let mut buf = String::new();
+    println!("{}", prompt);
+    reader.read_line(&mut buf)?;
+    let buf = String::from(buf
+			   .trim_start_matches(char::is_whitespace)
+			   .trim_end_matches(char::is_whitespace));
+    Ok(buf)
+}
+
+fn topics_to_vec(topics: &str) -> Vec<String> {
+    let topics: Vec<String> = topics.split(",")
+        .map(|s| s
+             .trim_start_matches(char::is_whitespace)
+             .trim_end_matches(char::is_whitespace)
+             .to_string())
+        .collect();
+
+    topics
 }
 
 /// TODO Document
@@ -80,6 +97,18 @@ pub struct Credentials {
 pub struct DocPaths {
     templates: String,
     webroot: String,
+}
+
+impl DocPaths {
+    fn create_paths(&self, blog: &Blog) -> Result<(), Box<dyn std::error::Error>> {
+	create_dir_all(&self.templates)?;
+	create_dir_all(format!("{}/static/ext", &self.webroot))?;
+	for topic in &blog.topics {
+	    create_dir_all(format!("{}/{}/ext", &self.webroot, &topic))?;
+	    create_dir_all(format!("{}/{}/posts", &self.webroot, &topic))?;
+	}
+	Ok(())
+    }
 }
 
 /// TODO Document
@@ -109,28 +138,43 @@ impl AppConfig {
 	let current_path = std::env::current_dir()?;
 	let current_path = current_path.display();
 
-	let name = Self::get_input("Please enter a name for the blog: ", reader)?;
-	let author = Self::get_input("Please enter the blog author's name: ", reader)?;
-	let topics = Self::get_input("Please enter comma-separated blog topics: ", reader)?;
-	let topics: Vec<String> = topics.split(",")
-	    .map(|s| s
-		 .trim_start_matches(char::is_whitespace)
-		 .trim_end_matches(char::is_whitespace)
-		 .to_string())
-	    .collect();
+	let templates = format!("{}/blog/templates", current_path); 
+	let webroot = format!("{}/blog/webroot", current_path); 
+	let docpaths = DocPaths { templates, webroot };
+
+	let name = get_input("Please enter a name for the blog: ", reader)?;
+	let author = get_input("Please enter the blog author's name: ", reader)?;
+	let topics = get_input("Please enter comma-separated blog topics: ", reader)?;
+	let topics = topics_to_vec(&topics);
 	let blog = Blog { name, author, topics };
 
-	let user = Self::get_input("Please enter an username for the blog admin: ", reader)?;
+	docpaths.create_paths(&blog)?;
 
+	let user = get_input("Please enter an username for the blog admin: ", reader)?;
 	const PASSWORD_LEN: usize = 32;
-	let password = auth::generate_alphanum_password(PASSWORD_LEN)?;
-	println!("Save this random password for your admin: {}", password);
+	let password = auth::generate_secret(PASSWORD_LEN)?;
+	let password_file = format!("{}/blog/{}.pass", current_path, user);
+	let password_file = Path::new(&password_file);
+	if cfg!(unix) {
+	    use std::os::unix::fs::OpenOptionsExt;
+	    let mut options = OpenOptions::new();
+	    options.create(true);
+	    options.write(true);
+	    options.mode(0o600);
+	    let mut password_file = options.open(password_file)?;
+	    auth::write_secret(&password, &mut password_file)?;
+	} else {
+	    let mut password_file = File::create(&password_file)?;
+	    auth::write_secret(&password, &mut password_file)?;
+	    let metadata = password_file.metadata()?;
+	    let mut perms = metadata.permissions();
+	    perms.set_readonly(true);
+	}
+
+	println!("Password generated and saved at: {}", password_file.to_path_buf().display());
 
 	let creds = Credentials { user, password };
 
-	let templates = format!("{}/{}/templates", current_path, "blog"); 
-	let webroot = format!("{}/{}/webroot", current_path, "blog"); 
-	let docpaths = DocPaths { templates, webroot };
 
 	let level = format!("INFO");
 	let logging = LogConfig { level };
@@ -144,20 +188,10 @@ impl AppConfig {
 
 	Ok(config)
     }
-
-    fn get_input<R: BufRead>(prompt: &str, reader: &mut R) -> Result<String, Box<dyn std::error::Error>> {
-	let mut buf = String::new();
-	println!("{}", prompt);
-	reader.read_line(&mut buf)?;
-	let buf = String::from(buf
-			       .trim_start_matches(char::is_whitespace)
-			       .trim_end_matches(char::is_whitespace));
-	Ok(buf)
-    }
 }
 
 #[cfg(test)]
-mod tests{
+mod tests {
     use super::*;
 
     #[test]
@@ -169,79 +203,28 @@ mod tests{
     }
 
     #[test]
-    fn generate_blog_config() {
+    fn get_user_input() {
 	// Setup all target fields
 	let name = format!("Blog Name");
 	let author = format!("Author Name");
-	let topics: Vec<String> = vec![format!("One"), format!("Two"), format!("Three"), format!("And More")];
-	let blog = Blog { name, author, topics };
-
+	let topics = format!("One, Two, Three, And More");
 	let user = format!("admin");
 	let password = format!("MagicPassword");
-	let creds = Credentials { user, password };
-
-	let current_path = std::env::current_dir().unwrap();
-	let current_path = current_path.display();
-	let templates = format!("{}/blog/templates", current_path);
-	let webroot = format!("{}/blog/webroot", current_path);
-	let docpaths = DocPaths { templates, webroot };
-
 	let level = format!("INFO");
-	let logging = LogConfig { level };
 	
-	let reference_config = AppConfig {
-	    blog,
-	    creds,
-	    logging,
-	    docpaths,
-	};
-	
+	let reference_strings = vec![name, author, topics, user, password, level];
 	let mut src: &[u8] = b"Blog Name\nAuthor Name\nOne, Two, Three, And More\nadmin\nMagicPassword\nINFO\n";
-	let arg_vec = vec!["caty-blog", "new"];
-	let matches = args().get_matches_from(arg_vec);
-	if  matches.is_present("new") {
-	    if let Ok(config) = generate(&mut src) {
-		assert_eq!(reference_config, config)
-	    } else {
-		panic!("Failed to generate the reference config")
-	    }
+
+	for field in reference_strings {
+	    assert_eq!(field, get_input(&field, &mut src).unwrap())
 	}
+	
     }
 
-    // Generate function locally for testing AppConfig::get_input
-    fn generate<R: BufRead>(reader: &mut R) -> Result<AppConfig, Box<dyn std::error::Error>> {
-	let current_path = std::env::current_dir()?;
-	let current_path = current_path.display();
-
-	let name = AppConfig::get_input("Please enter a name for the blog: ", reader)?;
-	let author = AppConfig::get_input("Please enter the blog author's name: ", reader)?;
-	let topics = AppConfig::get_input("Please enter comma-separated blog topics: ", reader)?;
-	let topics: Vec<String> = topics.split(",")
-	    .map(|s| s
-		 .trim_start_matches(char::is_whitespace)
-		 .trim_end_matches(char::is_whitespace)
-		 .to_string())
-	    .collect();
-	let blog = Blog { name, author, topics };
-
-	let user = AppConfig::get_input("Please enter an username for the blog admin: ", reader)?;
-	let password = AppConfig::get_input("Please enter a password for the blog admin: ", reader)?;
-	let creds = Credentials { user, password };
-
-	let templates = format!("{}/{}/templates", current_path, "blog"); 
-	let webroot = format!("{}/{}/webroot", current_path, "blog"); 
-	let docpaths = DocPaths { templates, webroot };
-
-	let level = format!("INFO");
-	let logging = LogConfig { level };
-	
-	let config = AppConfig {
-	    blog,
-	    creds,
-	    logging,
-	    docpaths,
-	};
-
-	Ok(config)
+    #[test]
+    fn handle_csv_topics() {
+	let reference_topics: Vec<String> = vec![format!("One"), format!("Two"), format!("Three"), format!("And More")];
+	let topics = format!("One, Two, Three, And More");
+	assert_eq!(reference_topics, topics_to_vec(&topics))
     }
 }
