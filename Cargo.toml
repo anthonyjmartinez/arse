@@ -7,15 +7,21 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+argon2 = "0.1"
 clap = "2.33.3"
 data-encoding = "2.3.2"
-tera = "1.7.0"
+log = "0.4.14"
 pulldown-cmark = { version = "0.8", default-features = false, features = ["simd"] }
 rand = "0.8"
 serde = { version = "1", features = ["derive"] }
+simplelog = "0.10.0"
+tera = "1.7.0"
 tokio = { version = "1", features = ["full"] }
 toml = "0.5"
 warp = "0.3"
+
+[dev-dependencies]
+tempfile = "3"
 
 [profile.release]
 panic = "abort"

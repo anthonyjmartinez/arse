@@ -1,4 +1,4 @@
-use std::fs::{create_dir_all, File, OpenOptions};
+use std::fs::create_dir_all;
 use std::{io::BufRead, usize};
 use std::path::Path;
 
@@ -36,7 +36,8 @@ pub fn load() -> Result<AppConfig, Box<dyn std::error::Error>> {
     } else if matches.is_present("new") {
 	let reader = std::io::stdin();
 	let mut reader = reader.lock();
-	config = AppConfig::generate(&mut reader);
+	let current_path = std::env::current_dir()?;
+	config = AppConfig::generate(current_path, &mut reader);
     } else {
 	let msg = format!("Unable to load configuration");
 	config = Err(From::from(msg));
@@ -66,15 +67,15 @@ fn get_input<R: BufRead>(prompt: &str, reader: &mut R) -> Result<String, Box<dyn
     Ok(buf)
 }
 
-fn topics_to_vec(topics: &str) -> Vec<String> {
-    let topics: Vec<String> = topics.split(",")
+fn csv_to_vec(csv: &str) -> Vec<String> {
+    let val_vec: Vec<String> = csv.split(",")
         .map(|s| s
              .trim_start_matches(char::is_whitespace)
              .trim_end_matches(char::is_whitespace)
              .to_string())
         .collect();
 
-    topics
+    val_vec
 }
 
 /// TODO Document
@@ -85,11 +86,46 @@ pub struct Blog {
     topics: Vec<String>,
 }
 
+impl Blog {
+    fn new_from_input<R: BufRead>(reader: &mut R) -> Result<Blog, Box<dyn std::error::Error>> {
+	let name = get_input("Please enter a name for the blog: ", reader)?;
+	let author = get_input("Please enter the blog author's name: ", reader)?;
+	let topics = get_input("Please enter comma-separated blog topics: ", reader)?;
+	let topics = csv_to_vec(&topics);
+	let blog = Blog { name, author, topics };
+
+	Ok(blog)
+    }
+}
+
 /// TODO Document
 #[derive(Debug, Deserialize, PartialEq)]
 pub struct Credentials {
     user: String,
     password: String,
+    token: String,
+}
+
+impl Credentials {
+    fn new_from_input<P: AsRef<Path>, R: BufRead>(dir: P, reader: &mut R) -> Result<Credentials, Box<dyn std::error::Error>> {
+	let user = get_input("Please enter an username for the blog admin: ", reader)?;
+	const PASSWORD_LEN: usize = 32;
+	let password = auth::generate_secret(PASSWORD_LEN)?;
+	let password_file = dir.as_ref().join("admin.pass");
+	auth::write_secret_file(&password, password_file)?;
+	let password = auth::generate_argon2_phc(&password)?;
+
+	const TOKEN_LEN: usize = 34;
+	let token = auth::generate_secret(TOKEN_LEN)?;
+	let token = token.as_bytes();
+	let token = auth::BASE32_NOPAD.encode(token);
+	let token_file = dir.as_ref().join("admin.totp");
+	auth::write_secret_file(&token, token_file)?;
+	
+	let creds = Credentials { user, password, token };
+
+	Ok(creds)
+    }
 }
 
 /// TODO Document
@@ -100,14 +136,13 @@ pub struct DocPaths {
 }
 
 impl DocPaths {
-    fn create_paths(&self, blog: &Blog) -> Result<(), Box<dyn std::error::Error>> {
-	create_dir_all(&self.templates)?;
-	create_dir_all(format!("{}/static/ext", &self.webroot))?;
-	for topic in &blog.topics {
-	    create_dir_all(format!("{}/{}/ext", &self.webroot, &topic))?;
-	    create_dir_all(format!("{}/{}/posts", &self.webroot, &topic))?;
-	}
-	Ok(())
+    fn new<P: AsRef<Path>>(dir: P) -> Result<DocPaths, Box<dyn std::error::Error>> {
+	let dir = dir.as_ref().display();
+	let templates = format!("{}/blog/templates", dir); 
+	let webroot = format!("{}/blog/webroot", dir); 
+	let docpaths = DocPaths { templates, webroot };
+
+	Ok(docpaths)
     }
 }
 
@@ -134,48 +169,10 @@ impl AppConfig {
 	Ok(app_config)
     }
 
-    fn generate<R: BufRead>(reader: &mut R) -> Result<AppConfig, Box<dyn std::error::Error>> {
-	let current_path = std::env::current_dir()?;
-	let current_path = current_path.display();
-
-	let templates = format!("{}/blog/templates", current_path); 
-	let webroot = format!("{}/blog/webroot", current_path); 
-	let docpaths = DocPaths { templates, webroot };
-
-	let name = get_input("Please enter a name for the blog: ", reader)?;
-	let author = get_input("Please enter the blog author's name: ", reader)?;
-	let topics = get_input("Please enter comma-separated blog topics: ", reader)?;
-	let topics = topics_to_vec(&topics);
-	let blog = Blog { name, author, topics };
-
-	docpaths.create_paths(&blog)?;
-
-	let user = get_input("Please enter an username for the blog admin: ", reader)?;
-	const PASSWORD_LEN: usize = 32;
-	let password = auth::generate_secret(PASSWORD_LEN)?;
-	let password_file = format!("{}/blog/{}.pass", current_path, user);
-	let password_file = Path::new(&password_file);
-	if cfg!(unix) {
-	    use std::os::unix::fs::OpenOptionsExt;
-	    let mut options = OpenOptions::new();
-	    options.create(true);
-	    options.write(true);
-	    options.mode(0o600);
-	    let mut password_file = options.open(password_file)?;
-	    auth::write_secret(&password, &mut password_file)?;
-	} else {
-	    let mut password_file = File::create(&password_file)?;
-	    auth::write_secret(&password, &mut password_file)?;
-	    let metadata = password_file.metadata()?;
-	    let mut perms = metadata.permissions();
-	    perms.set_readonly(true);
-	}
-
-	println!("Password generated and saved at: {}", password_file.to_path_buf().display());
-
-	let creds = Credentials { user, password };
-
-
+    fn generate<P: AsRef<Path>, R: BufRead>(dir: P, reader: &mut R) -> Result<AppConfig, Box<dyn std::error::Error>> {
+	let docpaths = DocPaths::new(&dir)?;
+	let blog = Blog::new_from_input(reader)?;
+	let creds = Credentials::new_from_input(&dir, reader)?;
 	let level = format!("INFO");
 	let logging = LogConfig { level };
 	
@@ -186,13 +183,33 @@ impl AppConfig {
 	    docpaths,
 	};
 
+	config.create_paths()?;
+
 	Ok(config)
+    }
+
+    fn create_paths(&self) -> Result<(), Box<dyn std::error::Error>> {
+	create_dir_all(&self.docpaths.templates)?;
+	create_dir_all(format!("{}/static/ext", &self.docpaths.webroot))?;
+	create_dir_all(format!("{}/main/ext", &self.docpaths.webroot))?;
+	create_dir_all(format!("{}/main/posts", &self.docpaths.webroot))?;
+
+	for topic in &self.blog.topics {
+	    let topic = topic
+		.to_ascii_lowercase()
+		.replace(char::is_whitespace, "-");
+
+	    create_dir_all(format!("{}/{}/ext", &self.docpaths.webroot, &topic))?;
+	    create_dir_all(format!("{}/{}/posts", &self.docpaths.webroot, &topic))?;
+	}
+	Ok(())
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tempfile;
 
     #[test]
     fn build_run_config() {
@@ -203,28 +220,42 @@ mod tests {
     }
 
     #[test]
-    fn get_user_input() {
+    fn build_config_from_input() {
+	let dir = tempfile::tempdir().unwrap();
 	// Setup all target fields
-	let name = format!("Blog Name");
-	let author = format!("Author Name");
-	let topics = format!("One, Two, Three, And More");
-	let user = format!("admin");
-	let password = format!("MagicPassword");
-	let level = format!("INFO");
-	
-	let reference_strings = vec![name, author, topics, user, password, level];
-	let mut src: &[u8] = b"Blog Name\nAuthor Name\nOne, Two, Three, And More\nadmin\nMagicPassword\nINFO\n";
+	let mut src: &[u8] = b"Blog Name\nAuthor Name\nOne, Two, Three, And More\nadmin\n";
+	let config = AppConfig::generate(&dir, &mut src);
+	assert!(config.is_ok());
 
-	for field in reference_strings {
-	    assert_eq!(field, get_input(&field, &mut src).unwrap())
+	let tmp_dir = &dir.path();
+	let admin = &tmp_dir.join("admin.pass");
+	let token = &tmp_dir.join("admin.totp");
+	let blog = &tmp_dir.join("blog");
+	let templates = &tmp_dir.join("blog/templates");
+	let webroot = &tmp_dir.join("blog/webroot");
+	let static_ext = &tmp_dir.join("blog/webroot/static/ext");
+	let main_ext = &tmp_dir.join("blog/webroot/main/ext");
+	let main_posts = &tmp_dir.join("blog/webroot/main/posts");
+	let one_ext = &tmp_dir.join("blog/webroot/one/ext");
+	let one_posts = &tmp_dir.join("blog/webroot/one/posts");
+	let two_ext = &tmp_dir.join("blog/webroot/two/ext");
+	let two_posts = &tmp_dir.join("blog/webroot/two/posts");
+	let three_ext = &tmp_dir.join("blog/webroot/three/ext");
+	let three_posts = &tmp_dir.join("blog/webroot/three/posts");
+	let and_more_ext = &tmp_dir.join("blog/webroot/and-more/ext");
+	let and_more_posts = &tmp_dir.join("blog/webroot/and-more/posts");
+	let core = vec![admin, token, blog, templates, webroot, static_ext, main_ext, main_posts,
+	one_ext, one_posts, two_ext, two_posts, three_ext, three_posts, and_more_ext, and_more_posts];
+	for p in core {
+	    assert!(Path::new(p).exists())
 	}
-	
     }
 
     #[test]
     fn handle_csv_topics() {
 	let reference_topics: Vec<String> = vec![format!("One"), format!("Two"), format!("Three"), format!("And More")];
 	let topics = format!("One, Two, Three, And More");
-	assert_eq!(reference_topics, topics_to_vec(&topics))
+	assert_eq!(reference_topics, csv_to_vec(&topics))
     }
+
 }

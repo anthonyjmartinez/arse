@@ -6,6 +6,7 @@ topics = ["one", "two", "three"]
 [creds]
 user = "admin"
 password = "123456"
+token = "my very secret token"
 
 [logging]
 level = "INFO"

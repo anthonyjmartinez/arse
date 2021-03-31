@@ -1,4 +1,7 @@
+use std::fs::OpenOptions;
 use std::io::prelude::*;
+use std::path::Path;
+
 
 /// TODO Document
 pub fn generate_secret(len: usize) -> Result<String, Box<dyn std::error::Error>> {
@@ -18,9 +21,44 @@ pub fn generate_secret(len: usize) -> Result<String, Box<dyn std::error::Error>>
 }
 
 /// TODO Document
-pub fn write_secret<T: Write>(secret: &str, dest: &mut T) -> std::io::Result<()> {
-    dest.write_all(secret.as_bytes())
+pub fn generate_argon2_phc(secret: &str) -> Result<String, Box<dyn std::error::Error>> {
+    use rand::rngs::OsRng;
+    use argon2::{Argon2, password_hash::{SaltString, PasswordHasher}};
+
+    let secret = secret.as_bytes();
+    let salt = SaltString::generate(&mut OsRng);
+    let argon2 = Argon2::default();
+    let argon2_phc: Result<String, Box<dyn std::error::Error>>;
+    if let Ok(phc) = argon2.hash_password_simple(secret, salt.as_ref()) {
+	argon2_phc = Ok(phc.to_string());
+    } else {
+	argon2_phc = Err(From::from("Failed to hash password"));
+    }
+
+    argon2_phc
 }
+
+#[cfg(target_family = "unix")]
+pub fn write_secret_file<P: AsRef<Path>>(secret: &str, dest: P) -> std::io::Result<()> { 
+    use std::os::unix::fs::OpenOptionsExt;
+    let mut options = OpenOptions::new();
+    options.create(true);
+    options.write(true);
+    options.mode(0o600);
+    let mut secret_file = options.open(dest)?;
+    secret_file.write_all(secret.as_bytes())
+}
+
+#[cfg(target_family = "windows")]
+pub fn write_secret_file<P: AsRef<Path>>(secret: &str, dest: P) -> Result<(), Box<dyn std::error::Error>> {
+    let mut secret_file = File::create(dest)?;
+    secret_file.write_all(secret.as_bytes())?;
+    let metadata = secret_file.metadata()?;
+    let mut perms = metadata.permissions();
+    perms.set_readonly(true);
+    Ok(())
+}
+
 
 pub use data_encoding::BASE32_NOPAD;
 
@@ -43,11 +81,10 @@ mod tests {
     }
 
     #[test]
-    fn check_write_secret() {
-	let mut writer: Vec<u8> = vec![];
+    fn check_argon2_hasher() {
 	const SECLEN: usize = 32;
 	let secret = generate_secret(SECLEN).unwrap();
-	write_secret(&secret, &mut writer).unwrap();
-	assert_eq!(SECLEN, writer.len())
+	let phc = generate_argon2_phc(&secret);
+	assert!(phc.is_ok())
     }
 }
