@@ -1,8 +1,3 @@
-use std::fs::OpenOptions;
-use std::io::prelude::*;
-use std::path::Path;
-
-
 /// TODO Document
 pub fn generate_secret(len: usize) -> Result<String, Box<dyn std::error::Error>> {
     use rand::{thread_rng, Rng,
@@ -37,28 +32,6 @@ pub fn generate_argon2_phc(secret: &str) -> Result<String, Box<dyn std::error::E
 
     argon2_phc
 }
-
-#[cfg(target_family = "unix")]
-pub fn write_secret_file<P: AsRef<Path>>(secret: &str, dest: P) -> std::io::Result<()> { 
-    use std::os::unix::fs::OpenOptionsExt;
-    let mut options = OpenOptions::new();
-    options.create(true);
-    options.write(true);
-    options.mode(0o600);
-    let mut secret_file = options.open(dest)?;
-    secret_file.write_all(secret.as_bytes())
-}
-
-#[cfg(target_family = "windows")]
-pub fn write_secret_file<P: AsRef<Path>>(secret: &str, dest: P) -> Result<(), Box<dyn std::error::Error>> {
-    let mut secret_file = File::create(dest)?;
-    secret_file.write_all(secret.as_bytes())?;
-    let metadata = secret_file.metadata()?;
-    let mut perms = metadata.permissions();
-    perms.set_readonly(true);
-    Ok(())
-}
-
 
 pub use data_encoding::BASE32_NOPAD;
 

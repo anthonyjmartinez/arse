@@ -4,7 +4,7 @@ use std::path::Path;
 
 use clap::{App, AppSettings, Arg, ArgMatches, SubCommand};
 
-use serde::Deserialize;
+use serde::{Serialize, Deserialize};
 use toml;
 
 use crate::auth;
@@ -79,7 +79,7 @@ fn csv_to_vec(csv: &str) -> Vec<String> {
 }
 
 /// TODO Document
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Debug, Deserialize, Serialize, PartialEq)]
 pub struct Blog {
     name: String,
     author: String,
@@ -99,7 +99,7 @@ impl Blog {
 }
 
 /// TODO Document
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Debug, Deserialize, Serialize, PartialEq)]
 pub struct Credentials {
     user: String,
     password: String,
@@ -112,7 +112,7 @@ impl Credentials {
 	const PASSWORD_LEN: usize = 32;
 	let password = auth::generate_secret(PASSWORD_LEN)?;
 	let password_file = dir.as_ref().join("admin.pass");
-	auth::write_secret_file(&password, password_file)?;
+	crate::io::str_to_ro_file(&password, password_file)?;
 	let password = auth::generate_argon2_phc(&password)?;
 
 	const TOKEN_LEN: usize = 34;
@@ -120,7 +120,7 @@ impl Credentials {
 	let token = token.as_bytes();
 	let token = auth::BASE32_NOPAD.encode(token);
 	let token_file = dir.as_ref().join("admin.totp");
-	auth::write_secret_file(&token, token_file)?;
+	crate::io::str_to_ro_file(&token, token_file)?;
 	
 	let creds = Credentials { user, password, token };
 
@@ -129,7 +129,7 @@ impl Credentials {
 }
 
 /// TODO Document
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Debug, Deserialize, Serialize, PartialEq)]
 pub struct DocPaths {
     templates: String,
     webroot: String,
@@ -147,13 +147,13 @@ impl DocPaths {
 }
 
 /// TODO Document
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Debug, Deserialize, Serialize, PartialEq)]
 pub struct LogConfig {
     level: String
 }
 
 /// TODO Document
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Debug, Deserialize, Serialize, PartialEq)]
 pub struct AppConfig {
     blog: Blog,
     creds: Credentials,
@@ -184,6 +184,7 @@ impl AppConfig {
 	};
 
 	config.create_paths()?;
+	config.write(&dir)?;
 
 	Ok(config)
     }
@@ -202,6 +203,13 @@ impl AppConfig {
 	    create_dir_all(format!("{}/{}/ext", &self.docpaths.webroot, &topic))?;
 	    create_dir_all(format!("{}/{}/posts", &self.docpaths.webroot, &topic))?;
 	}
+	Ok(())
+    }
+
+    fn write<P: AsRef<Path>>(&self, dir: P) -> Result<(), Box<dyn std::error::Error>> {
+	let config = toml::to_string_pretty(&self)?;
+	let conf_path = &dir.as_ref().join("config.toml");
+	crate::io::str_to_ro_file(&config, &conf_path)?;
 	Ok(())
     }
 }
@@ -228,6 +236,7 @@ mod tests {
 	assert!(config.is_ok());
 
 	let tmp_dir = &dir.path();
+	let config_path = &tmp_dir.join("config.toml");
 	let admin = &tmp_dir.join("admin.pass");
 	let token = &tmp_dir.join("admin.totp");
 	let blog = &tmp_dir.join("blog");
@@ -244,8 +253,10 @@ mod tests {
 	let three_posts = &tmp_dir.join("blog/webroot/three/posts");
 	let and_more_ext = &tmp_dir.join("blog/webroot/and-more/ext");
 	let and_more_posts = &tmp_dir.join("blog/webroot/and-more/posts");
-	let core = vec![admin, token, blog, templates, webroot, static_ext, main_ext, main_posts,
-	one_ext, one_posts, two_ext, two_posts, three_ext, three_posts, and_more_ext, and_more_posts];
+	let core = vec![config_path, admin, token, blog, templates,
+			webroot, static_ext, main_ext, main_posts,
+			one_ext, one_posts, two_ext, two_posts,
+			three_ext, three_posts, and_more_ext, and_more_posts];
 	for p in core {
 	    assert!(Path::new(p).exists())
 	}
