@@ -81,13 +81,13 @@ fn csv_to_vec(csv: &str) -> Vec<String> {
 /// TODO Document
 #[derive(Debug, Deserialize, Serialize, PartialEq)]
 pub struct Blog {
-    name: String,
-    author: String,
-    topics: Vec<String>,
+    pub name: String,
+    pub author: String,
+    pub topics: Vec<String>,
 }
 
 impl Blog {
-    fn new_from_input<R: BufRead>(reader: &mut R) -> Result<Blog, Box<dyn std::error::Error>> {
+    pub fn new_from_input<R: BufRead>(reader: &mut R) -> Result<Blog, Box<dyn std::error::Error>> {
 	let name = get_input("Please enter a name for the blog: ", reader)?;
 	let author = get_input("Please enter the blog author's name: ", reader)?;
 	let topics = get_input("Please enter comma-separated blog topics: ", reader)?;
@@ -101,13 +101,13 @@ impl Blog {
 /// TODO Document
 #[derive(Debug, Deserialize, Serialize, PartialEq)]
 pub struct Credentials {
-    user: String,
-    password: String,
-    token: String,
+    pub user: String,
+    pub password: String,
+    pub token: String,
 }
 
 impl Credentials {
-    fn new_from_input<P: AsRef<Path>, R: BufRead>(dir: P, reader: &mut R) -> Result<Credentials, Box<dyn std::error::Error>> {
+    pub fn new_from_input<P: AsRef<Path>, R: BufRead>(dir: P, reader: &mut R) -> Result<Credentials, Box<dyn std::error::Error>> {
 	let user = get_input("Please enter an username for the blog admin: ", reader)?;
 	const PASSWORD_LEN: usize = 32;
 	let password = auth::generate_secret(PASSWORD_LEN)?;
@@ -131,12 +131,12 @@ impl Credentials {
 /// TODO Document
 #[derive(Debug, Deserialize, Serialize, PartialEq)]
 pub struct DocPaths {
-    templates: String,
-    webroot: String,
+    pub templates: String,
+    pub webroot: String,
 }
 
 impl DocPaths {
-    fn new<P: AsRef<Path>>(dir: P) -> Result<DocPaths, Box<dyn std::error::Error>> {
+    pub fn new<P: AsRef<Path>>(dir: P) -> Result<DocPaths, Box<dyn std::error::Error>> {
 	let dir = dir.as_ref().display();
 	let templates = format!("{}/blog/templates", dir); 
 	let webroot = format!("{}/blog/webroot", dir); 
@@ -155,21 +155,21 @@ pub struct LogConfig {
 /// TODO Document
 #[derive(Debug, Deserialize, Serialize, PartialEq)]
 pub struct AppConfig {
-    blog: Blog,
-    creds: Credentials,
-    logging: LogConfig,
-    docpaths: DocPaths,
+    pub blog: Blog,
+    pub creds: Credentials,
+    pub logging: LogConfig,
+    pub docpaths: DocPaths,
 }
 
 impl AppConfig {
-    fn new<T>(config: T) -> Result<AppConfig, Box<dyn std::error::Error>>
+    pub fn new<T>(config: T) -> Result<AppConfig, Box<dyn std::error::Error>>
     where T: AsRef<Path> {
 	let config = std::fs::read_to_string(config)?;
 	let app_config: AppConfig = toml::from_str(&config)?;
 	Ok(app_config)
     }
 
-    fn generate<P: AsRef<Path>, R: BufRead>(dir: P, reader: &mut R) -> Result<AppConfig, Box<dyn std::error::Error>> {
+    pub fn generate<P: AsRef<Path>, R: BufRead>(dir: P, reader: &mut R) -> Result<AppConfig, Box<dyn std::error::Error>> {
 	let docpaths = DocPaths::new(&dir)?;
 	let blog = Blog::new_from_input(reader)?;
 	let creds = Credentials::new_from_input(&dir, reader)?;
