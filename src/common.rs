@@ -1,6 +1,8 @@
 use std::fs::OpenOptions;
 use std::io::prelude::*;
-use std::path::Path;
+use std::path::{Path, PathBuf};
+
+use glob::glob;
 
 #[cfg(target_family = "unix")]
 pub fn str_to_ro_file<P: AsRef<Path>>(content: &str, dest: P) -> Result<(), Box<dyn std::error::Error>> { 
@@ -29,3 +31,22 @@ pub fn str_to_ro_file<P: AsRef<Path>>(content: &str, dest: P) -> Result<(), Box<
     perms.set_readonly(true);
     Ok(())
 }
+
+pub fn path_matches(pat: &str) -> Result<Vec<PathBuf>, Box<dyn std::error::Error>> {
+    let mut path_vec: Vec<PathBuf> = Vec::new();
+    let entries = glob(pat)?;
+    for entry in entries.filter_map(Result::ok) {
+	path_vec.push(entry);
+    }
+    
+    path_vec.reverse();
+    Ok(path_vec)
+}
+
+pub fn slugify(topic: &str) -> String {
+    let topic = topic
+        .to_ascii_lowercase()
+        .replace(char::is_whitespace, "-");
+    topic
+}
+

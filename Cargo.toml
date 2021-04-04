@@ -10,6 +10,7 @@ edition = "2018"
 argon2 = "0.1"
 clap = "2.33.3"
 data-encoding = "2.3.2"
+glob = "0.3.0"
 log = "0.4.14"
 pulldown-cmark = { version = "0.8", default-features = false, features = ["simd"] }
 rand = "0.8"

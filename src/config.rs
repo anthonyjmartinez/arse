@@ -8,6 +8,7 @@ use serde::{Serialize, Deserialize};
 use toml;
 
 use crate::auth;
+use crate::common;
 
 fn args() -> App<'static, 'static> {
     App::new("Caty's Blog")
@@ -112,7 +113,7 @@ impl Credentials {
 	const PASSWORD_LEN: usize = 32;
 	let password = auth::generate_secret(PASSWORD_LEN)?;
 	let password_file = dir.as_ref().join("admin.pass");
-	crate::io::str_to_ro_file(&password, password_file)?;
+	common::str_to_ro_file(&password, password_file)?;
 	let password = auth::generate_argon2_phc(&password)?;
 
 	const TOKEN_LEN: usize = 34;
@@ -120,7 +121,7 @@ impl Credentials {
 	let token = token.as_bytes();
 	let token = auth::BASE32_NOPAD.encode(token);
 	let token_file = dir.as_ref().join("admin.totp");
-	crate::io::str_to_ro_file(&token, token_file)?;
+	common::str_to_ro_file(&token, token_file)?;
 	
 	let creds = Credentials { user, password, token };
 
@@ -196,9 +197,7 @@ impl AppConfig {
 	create_dir_all(format!("{}/main/posts", &self.docpaths.webroot))?;
 
 	for topic in &self.blog.topics {
-	    let topic = topic
-		.to_ascii_lowercase()
-		.replace(char::is_whitespace, "-");
+	    let topic = common::slugify(&topic);
 
 	    create_dir_all(format!("{}/{}/ext", &self.docpaths.webroot, &topic))?;
 	    create_dir_all(format!("{}/{}/posts", &self.docpaths.webroot, &topic))?;
@@ -209,7 +208,7 @@ impl AppConfig {
     fn write<P: AsRef<Path>>(&self, dir: P) -> Result<(), Box<dyn std::error::Error>> {
 	let config = toml::to_string_pretty(&self)?;
 	let conf_path = &dir.as_ref().join("config.toml");
-	crate::io::str_to_ro_file(&config, &conf_path)?;
+	common::str_to_ro_file(&config, &conf_path)?;
 	Ok(())
     }
 }
