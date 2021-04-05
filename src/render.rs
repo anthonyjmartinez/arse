@@ -1,8 +1,8 @@
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use crate::config::AppConfig;
-use crate::common;
+use super::config::AppConfig;
+use super::common;
 
 pub use pulldown_cmark::{Parser, html};
 pub use tera::{Tera, Context};

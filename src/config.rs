@@ -7,8 +7,8 @@ use clap::{App, AppSettings, Arg, ArgMatches, SubCommand};
 use serde::{Serialize, Deserialize};
 use toml;
 
-use crate::auth;
-use crate::common;
+use super::auth;
+use super::common;
 
 fn args() -> App<'static, 'static> {
     App::new("Caty's Blog")
