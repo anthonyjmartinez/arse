@@ -1,105 +1,97 @@
+use std::convert::Infallible;
+use std::fs::File;
+use std::io::prelude::*;
 use std::path::Path;
 use std::sync::Arc;
+
+use hyper::{Body, Request, Response};//, StatusCode};
+use routerify::{prelude::*, Router};
 
 use super::config::AppConfig;
 use super::render;
 
-pub fn topic_posts(app: Arc<AppConfig>, topic: String) { 
-    let app = app.clone();
-    let t = topic.clone();
-    let handler = move || {
-	let mut body = String::new();
-	if let Ok(instance) = render::load_default_template() {
-	    let engine = render::Engine::new(app.clone(), &t, "default.tmpl", instance);
-	    if let Ok(output) = render::render_topic(engine) {
-		body = output;
-	    }
-	}
 
-    };
-
-    if &topic == "main" {
-	// Iron route
-    } else {
-	// Iron route
-    }
+pub fn router(app: Arc<AppConfig>) -> Router<Body, Infallible> {
+    Router::builder()
+        .data(app.clone())
+        .get("/", index_handler)
+        .get("/:topic", topic_handler)
+        .get("/:topic/ext/:fname", topic_assets)
+        .get("/static/:fname", static_assets)
+        .build()
+        .unwrap()
 }
 
-pub fn static_assets(app: Arc<AppConfig>) { 
-    let app = &app.clone();
-    let static_path = Path::new(&app.docpaths.webroot).join("static");
-    // Iron route
+/// Handler for "/"
+async fn index_handler(req: Request<Body>) -> Result<Response<Body>, Infallible> {
+    let app = req.data::<Arc<AppConfig>>().unwrap();
+    topic_posts(app.clone(), "main".to_owned()).await
 }
 
-pub fn topic_assets(app: Arc<AppConfig>, topic: String) { 
-    let app = &app.clone();
-    let topic_asset_path = Path::new(&app.docpaths.webroot).join(&topic).join("ext");
-    // Iron route
+/// Handler for "/:topic"
+async fn topic_handler(req: Request<Body>) -> Result<Response<Body>, Infallible> {
+    let app = req.data::<Arc<AppConfig>>().unwrap();
+    let topic = req.param("topic").unwrap();
+    topic_posts(app.clone(), topic.to_owned()).await
 }
+
+/// Called by topic_handler to dynamically generate topic pages 
+async fn topic_posts(app: Arc<AppConfig>, topic: String) -> Result<Response<Body>, Infallible> { 
+    let instance = render::load_default_template().unwrap();
+    let engine = render::Engine::new(app.clone(), &topic, "default.tmpl", instance);
+    let output = render::render_topic(engine).unwrap();
+    Ok(Response::new(Body::from(output)))
+}
+
+/// Handler for "/static/:fname"
+async fn static_assets(req: Request<Body>) -> Result<Response<Body>, Infallible> { 
+    let app = req.data::<Arc<AppConfig>>().unwrap();
+    let resource = req.param("fname").unwrap();
+    let static_path = Path::new(&app.docpaths.webroot).join("static").join(resource);
+    let mut f = File::open(static_path).unwrap();
+    let mut buf = Vec::new();
+    f.read_to_end(&mut buf).unwrap();
+    Ok(Response::new(Body::from(buf)))
+}
+
+/// Handler for "/:topic/ext/:fname"
+async fn topic_assets(req: Request<Body>) -> Result<Response<Body>, Infallible> { 
+    let app = req.data::<Arc<AppConfig>>().unwrap();
+    let topic = req.param("topic").unwrap();
+    let resource = req.param("fname").unwrap();
+    let topic_asset_path = Path::new(&app.docpaths.webroot).join(topic).join("ext").join(resource);
+    let mut f = File::open(topic_asset_path).unwrap();
+    let mut buf = Vec::new();
+    f.read_to_end(&mut buf).unwrap();
+    Ok(Response::new(Body::from(buf)))
+}
+
 
 #[cfg(test)]
 mod tests {
+    /*
     use std::fs::File;
     use std::io::prelude::*;
+    use std::net::SocketAddr;
 
     use super::*;
     use crate::config::AppConfig;
+    use routerify::RouterService;
     use tempfile;
 
+    // TODO: figure out how to actually test this....
+    
     #[tokio::test]
-    async fn main_page() {
+    async fn router_test() {
 	let dir = tempfile::tempdir().unwrap();
 	let mut src: &[u8] = b"Blog Name\nAuthor Name\nOne, Two, Three, And More\nadmin\n";
-	let config = AppConfig::generate(&dir, &mut src).unwrap();
-	let config = Arc::new(config);
-	let filter = topic_posts(config, "main".to_owned());
-
-	let test_file = b"### Some title\n\nsome bytes here\n";
-	let mut f = File::create(dir.path().join("blog/webroot/main/posts/1.md")).unwrap();
-	f.write_all(test_file).unwrap();
+	let app = AppConfig::generate(&dir, &mut src).unwrap();
+	let app = Arc::new(app);
+	let router = router(app.clone());
+	let service = RouterService::new(router).unwrap();
+	let addr: SocketAddr = "0.0.0.0:9999".parse().unwrap();
 
     }
+    */
 
-    #[tokio::test]
-    async fn topic_page() {
-	let dir = tempfile::tempdir().unwrap();
-	let mut src: &[u8] = b"Blog Name\nAuthor Name\nOne, Two, Three, And More\nadmin\n";
-	let config = AppConfig::generate(&dir, &mut src).unwrap();
-	let config = Arc::new(config);
-	let filter = topic_posts(config, "and-more".to_owned());
-
-	let test_file = b"### Some title\n\nsome bytes here\n";
-	let mut f = File::create(dir.path().join("blog/webroot/and-more/posts/1.md")).unwrap();
-	f.write_all(test_file).unwrap();
-
-    }
-
-    #[tokio::test]
-    async fn static_content() {
-	let dir = tempfile::tempdir().unwrap();
-	let mut src: &[u8] = b"Blog Name\nAuthor Name\nOne, Two, Three, And More\nadmin\n";
-	let config = AppConfig::generate(&dir, &mut src).unwrap();
-	let config = Arc::new(config);
-
-	let test_file = b"some bytes here\n";
-	let mut f = File::create(dir.path().join("blog/webroot/static/example")).unwrap();
-	f.write_all(test_file).unwrap();
-	let filter = static_assets(config);
-
-    }
-
-    #[tokio::test]
-    async fn topic_static() {
-	let dir = tempfile::tempdir().unwrap();
-	let mut src: &[u8] = b"Blog Name\nAuthor Name\nOne, Two, Three, And More\nadmin\n";
-	let config = AppConfig::generate(&dir, &mut src).unwrap();
-	let config = Arc::new(config);
-
-	let test_file = b"some bytes here\n";
-	let mut f = File::create(dir.path().join("blog/webroot/one/ext/example")).unwrap();
-	f.write_all(test_file).unwrap();
-
-	let filter = topic_assets(config.clone(), "one".to_owned());
-
-    }
 }

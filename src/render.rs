@@ -20,8 +20,8 @@ impl Engine {
     pub fn new(a: Arc<AppConfig>, ts: &str, tmpl: &str, inst: Tera) -> Engine {
 	Engine {
 	    app: a.clone(),
-	    topic_slug: ts.to_string(),
-	    template: tmpl.to_string(),
+	    topic_slug: ts.to_owned(),
+	    template: tmpl.to_owned(),
 	    instance: inst
 	}
     }
@@ -45,7 +45,7 @@ pub fn render_topic(engine: Engine) -> Result<String, Box<dyn std::error::Error>
 }
 
 fn load_topic(engine: &Engine) -> Result<Vec<String>, Box<dyn std::error::Error>> {
-    let topic_path = Path::new(&engine.app.docpaths.webroot).join(&engine.topic_slug);
+    let topic_path = Path::new(&engine.app.docpaths.webroot).join(&engine.topic_slug).join("posts");
     let pat = format!("{}/*.md", topic_path.display());
     let paths = common::path_matches(&pat)?;
     read_to_html(paths)
@@ -97,14 +97,15 @@ Very cool, but maybe not super useful
 Super Wow!
 "#;
 	
-	let mut f = File::create(&dir.path().join("blog").join("webroot").join("one").join("post1.md")).unwrap();
+	let mut f = File::create(&dir.path().join("blog/webroot/one/posts/post1.md")).unwrap();
 	f.write_all(&post.as_bytes()).unwrap();
 
-	let mut f = File::create(&dir.path().join("blog").join("webroot").join("one").join("post2.md")).unwrap();
+	let mut f = File::create(&dir.path().join("blog/webroot/one/posts/post2.md")).unwrap();
 	f.write_all(&post2.as_bytes()).unwrap();
 
-	let page = render_topic(engine);
+	let page = render_topic(engine).unwrap();
 
-	assert!(page.is_ok())
+	assert!(page.contains("super useful"));
+	assert!(page.contains("Super Wow!"));
     }
 }
