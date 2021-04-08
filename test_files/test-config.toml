@@ -1,0 +1,16 @@
+[blog]
+name = "My Awesome Blog!"
+author = "Neo"
+topics = ["one", "two", "three"]
+
+[creds]
+user = "admin"
+password = "123456"
+token = "my very secret token"
+
+[logging]
+level = "INFO"
+
+[docpaths]
+templates = "/var/www/blog/templates"
+webroot = "/var/www/blog/webroot"

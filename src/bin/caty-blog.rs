@@ -1,25 +1,25 @@
-use caty_blog::*;
-use warp::Filter;
+use std::net::SocketAddr;
+use std::sync::Arc;
 
+use caty_blog::*;
+use hyper::Server;
+use routerify::RouterService;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // TODO: Load configuration file defining paths to stuff
-    // Load into memory as a Struct in an Arc(Mutex(something))
-    // This should also include the admin username/hash(password)
+    let config = config::load()?;
+    let app = Arc::new(config);
+    
+    // TODO: Configure logging
 
-    write_main(&render_main())?;
+    let router = routes::router(app.clone());
+    let service = RouterService::new(router).unwrap();
+    let addr: SocketAddr = "0.0.0.0:9090".parse().unwrap();
+    let server = Server::bind(&addr).serve(service);
 
-    let static_files = warp::path("static")
-        .and(warp::fs::dir("webroot/static"));
-
-    let index = warp::get()
-        .and(warp::path::end())
-        .and(warp::fs::file("webroot/index.html"));
-
-    let routes = static_files.or(index);
-
-    warp::serve(routes).run(([127,0,0,1], 3030)).await;
+    if let Err(err) = server.await {
+	eprintln!("Server error: {}", err)
+    }
 
     Ok(())
 }
