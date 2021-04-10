@@ -69,29 +69,107 @@ async fn topic_assets(req: Request<Body>) -> Result<Response<Body>, Infallible> 
 
 #[cfg(test)]
 mod tests {
-    /*
     use std::fs::File;
-    use std::io::prelude::*;
     use std::net::SocketAddr;
+    use std::io::prelude::*;
 
     use super::*;
     use crate::config::AppConfig;
+    use hyper::{Body, Request, StatusCode, Server, Client};
     use routerify::RouterService;
     use tempfile;
+    use tokio::sync::oneshot::channel;
 
-    // TODO: figure out how to actually test this....
-    
+
     #[tokio::test]
-    async fn router_test() {
+    async fn check_all_handlers() {
 	let dir = tempfile::tempdir().unwrap();
 	let mut src: &[u8] = b"Blog Name\nAuthor Name\nOne, Two, Three, And More\nadmin\n";
 	let app = AppConfig::generate(&dir, &mut src).unwrap();
 	let app = Arc::new(app);
+	
+	let index_page = r#"
+### Main Page
+
+Main Important Test
+"#;
+	let mut f = File::create(&dir.path().join("blog/webroot/main/posts/index.md")).unwrap();
+	f.write_all(&index_page.as_bytes()).unwrap();
+
+	let topic_page = r#"
+### One Section
+
+One Important Test
+"#;
+	let mut f = File::create(&dir.path().join("blog/webroot/one/posts/index.md")).unwrap();
+	f.write_all(&topic_page.as_bytes()).unwrap();
+
+	let topic_asset = b"One Static File\n";
+
+	let mut f = File::create(&dir.path().join("blog/webroot/one/ext/one-static")).unwrap();
+	f.write_all(topic_asset).unwrap();
+
+	let static_asset = b"Static File\n";
+
+	let mut f = File::create(&dir.path().join("blog/webroot/static/main-static")).unwrap();
+	f.write_all(static_asset).unwrap();
+
 	let router = router(app.clone());
+
+	let index_request = Request::builder()
+	    .method("GET")
+	    .uri("http://localhost:10000")
+	    .body(Body::default())
+	    .unwrap();
+
+	let topic_request = Request::builder()
+	    .method("GET")
+	    .uri("http://localhost:10000/one")
+	    .body(Body::default())
+	    .unwrap();
+
+	let topic_asset_request = Request::builder()
+	    .method("GET")
+	    .uri("http://localhost:10000/one/ext/one-static")
+	    .body(Body::default())
+	    .unwrap();
+
+	let static_asset_request = Request::builder()
+	    .method("GET")
+	    .uri("http://localhost:10000/static/main-static")
+	    .body(Body::default())
+	    .unwrap();
+
 	let service = RouterService::new(router).unwrap();
-	let addr: SocketAddr = "0.0.0.0:9999".parse().unwrap();
+	let addr: SocketAddr = "127.0.0.1:10000".parse().unwrap();
 
+	let (tx, rx) = channel::<()>();
+
+	let server = Server::bind(&addr).serve(service);
+	
+	let graceful = server.
+	    with_graceful_shutdown(async {
+		rx.await.ok();
+	    });
+
+	tokio::spawn(async move {
+	    if let Err(e) = graceful.await {
+		println!("Encountered error: {}", e)
+	    }
+	});
+
+
+	let client = Client::new();
+
+	let index_resp = client.request(index_request).await.unwrap();
+	let topic_resp = client.request(topic_request).await.unwrap();
+	let topic_asset_resp = client.request(topic_asset_request).await.unwrap();
+	let static_asset_resp = client.request(static_asset_request).await.unwrap();
+	assert_eq!(index_resp.status(), StatusCode::OK);
+	assert_eq!(topic_resp.status(), StatusCode::OK);
+	assert_eq!(topic_asset_resp.status(), StatusCode::OK);
+	assert_eq!(static_asset_resp.status(), StatusCode::OK);
+
+	let _ = tx.send(());
     }
-    */
-
 }
