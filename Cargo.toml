@@ -1,6 +1,6 @@
 [package]
 name = "arse"
-version = "0.1.0-alpha"
+version = "0.2.0-alpha.1"
 authors = ["Anthony Martinez"]
 edition = "2018"
 license = "MIT OR Apache-2.0"
@@ -9,7 +9,7 @@ homepage = "https://git.staart.one/ajmartinez/arse"
 repository = "https://git.staart.one/ajmartinez/arse.git"
 description = "A Rust Site Engine"
 keywords = ["blog", "CLI", "website-engine"]
-categories = ["command-line-utilities, web-programming::http-server"]
+categories = ["command-line-utilities", "web-programming::http-server"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

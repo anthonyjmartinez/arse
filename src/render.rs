@@ -12,8 +12,8 @@ use std::sync::Arc;
 use super::config::AppConfig;
 use super::common;
 
-pub use pulldown_cmark::{Parser, html};
-pub use tera::{Tera, Context};
+use pulldown_cmark::{Parser, html};
+use tera::{Tera, Context};
 
 mod default;
 
