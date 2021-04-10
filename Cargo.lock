@@ -29,6 +29,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "arse"
+version = "0.1.0-alpha"
+dependencies = [
+ "argon2",
+ "clap",
+ "data-encoding",
+ "glob",
+ "hyper",
+ "log",
+ "pulldown-cmark",
+ "rand",
+ "routerify",
+ "serde",
+ "simplelog",
+ "tempfile",
+ "tera",
+ "tokio",
+ "toml",
+]
+
+[[package]]
 name = "atty"
 version = "0.2.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -115,27 +136,6 @@ name = "bytes"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b700ce4376041dcd0a327fd0097c41095743c4c8af8887265942faf1100bd040"
-
-[[package]]
-name = "caty_blog"
-version = "0.1.0"
-dependencies = [
- "argon2",
- "clap",
- "data-encoding",
- "glob",
- "hyper",
- "log",
- "pulldown-cmark",
- "rand",
- "routerify",
- "serde",
- "simplelog",
- "tempfile",
- "tera",
- "tokio",
- "toml",
-]
 
 [[package]]
 name = "cfg-if"

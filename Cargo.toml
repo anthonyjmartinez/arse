@@ -1,8 +1,15 @@
 [package]
-name = "caty_blog"
-version = "0.1.0"
-authors = ["Anthony Martinez", "Caty Christy"]
+name = "arse"
+version = "0.1.0-alpha"
+authors = ["Anthony Martinez"]
 edition = "2018"
+license = "MIT OR Apache-2.0"
+readme = "README.md"
+homepage = "https://git.staart.one/ajmartinez/arse"
+repository = "https://git.staart.one/ajmartinez/arse.git"
+description = "A Rust Site Engine"
+keywords = ["blog", "CLI", "website-engine"]
+categories = ["command-line-utilities, web-programming::http-server"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
