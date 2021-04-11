@@ -11,6 +11,7 @@ and flexible base for serving sites using:
 
 * Run an existing site given the path to its config TOML: `arse run config.toml`
 * Create and run a new site from user input: `arse new`
+* Logging verbosity can be increased with `-v` or `-vv`, the default level is `INFO`.
 
 ## Library
 

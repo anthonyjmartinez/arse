@@ -11,7 +11,8 @@ use std::{io::BufRead, usize};
 use std::path::Path;
 
 use clap::{App, AppSettings, Arg, ArgMatches, SubCommand};
-
+use log::{debug, error, info, trace, warn};
+use simplelog::{SimpleLogger, ConfigBuilder};
 use serde::{Serialize, Deserialize};
 use toml;
 
@@ -19,10 +20,14 @@ use super::auth;
 use super::common;
 
 fn args() -> App<'static, 'static> {
-    App::new("Caty's Blog")
-	.version("1.0")
+    App::new("A Rust Site Engine")
+	.version("0.3")
 	.author("Anthony Martinez")
         .setting(AppSettings::ArgRequiredElseHelp)
+        .arg(Arg::with_name("verbosity")
+             .short("v")
+             .multiple(true) 
+             .help("Sets the log level. Default: INFO. -v = DEBUG, -vv = TRACE"))
         .subcommand(SubCommand::with_name("run")
 		    .about("Run the blog server")
 		    .arg(Arg::with_name("config")
@@ -38,17 +43,36 @@ fn args() -> App<'static, 'static> {
 /// TODO Document this public function
 /// And Include an Example of its Use
 pub fn load() -> Result<AppConfig, Box<dyn std::error::Error>> {
-    let matches = args().get_matches();
     let config: Result<AppConfig, Box<dyn std::error::Error>>;
+    let matches = args().get_matches();
+
+    // Create a Config with ISO timestamps
+    let log_config = ConfigBuilder::new()
+        .set_time_format_str("%+")
+        .build();
+
+    // After this block locking is configured at the specified level
+    match matches.occurrences_of("verbosity") {
+	0 => SimpleLogger::init(log::LevelFilter::Info, log_config)?,
+	1 => SimpleLogger::init(log::LevelFilter::Debug, log_config)?,
+	2 | _ => SimpleLogger::init(log::LevelFilter::Trace, log_config)?,
+    }
+
+    info!("Logging started");
+
+    trace!("Processing subcommands");
     if matches.is_present("run") {
+	debug!("Application called with `run` subcommand - loading config from disk");
 	config = runner_config(matches);
     } else if matches.is_present("new") {
+	debug!("Application called with `new` subcommand - creating config from user input");
 	let reader = std::io::stdin();
 	let mut reader = reader.lock();
 	let current_path = std::env::current_dir()?;
 	config = AppConfig::generate(current_path, &mut reader);
     } else {
 	let msg = format!("Unable to load configuration");
+	error!("{}", &msg);
 	config = Err(From::from(msg));
     }
 
@@ -157,16 +181,9 @@ impl DocPaths {
 
 /// TODO Document
 #[derive(Debug, Deserialize, Serialize, PartialEq)]
-pub struct LogConfig {
-    level: String
-}
-
-/// TODO Document
-#[derive(Debug, Deserialize, Serialize, PartialEq)]
 pub struct AppConfig {
     pub blog: Blog,
     pub creds: Credentials,
-    pub logging: LogConfig,
     pub docpaths: DocPaths,
 }
 
@@ -182,13 +199,10 @@ impl AppConfig {
 	let docpaths = DocPaths::new(&dir)?;
 	let blog = Blog::new_from_input(reader)?;
 	let creds = Credentials::new_from_input(&dir, reader)?;
-	let level = format!("INFO");
-	let logging = LogConfig { level };
 	
 	let config = AppConfig {
 	    blog,
 	    creds,
-	    logging,
 	    docpaths,
 	};
 
@@ -228,7 +242,7 @@ mod tests {
 
     #[test]
     fn build_run_config() {
-	let arg_vec = vec!["caty-blog", "run", "./test_files/test-config.toml"];
+	let arg_vec = vec!["arse", "run", "./test_files/test-config.toml"];
 	let matches = args().get_matches_from(arg_vec);
 	let config = runner_config(matches);
 	assert!(config.is_ok());

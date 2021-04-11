@@ -10,23 +10,24 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 
 use arse::*;
+use log::{info, error};
 use hyper::Server;
 use routerify::RouterService;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = config::load()?;
+    info!("Configuration loaded");
     let app = Arc::new(config);
     
-    // TODO: Configure logging
-
     let router = routes::router(app.clone());
     let service = RouterService::new(router).unwrap();
     let addr: SocketAddr = "0.0.0.0:9090".parse().unwrap();
     let server = Server::bind(&addr).serve(service);
 
+    info!("Running server on: {}", &addr);
     if let Err(err) = server.await {
-	eprintln!("Server error: {}", err)
+	error!("Server error: {}", err)
     }
 
     Ok(())
