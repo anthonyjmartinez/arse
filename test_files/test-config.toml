@@ -1,4 +1,4 @@
-[blog]
+[site]
 name = "My Awesome Blog!"
 author = "Neo"
 topics = ["one", "two", "three"]
@@ -9,5 +9,5 @@ password = "123456"
 token = "my very secret token"
 
 [docpaths]
-templates = "/var/www/blog/templates"
-webroot = "/var/www/blog/webroot"
+templates = "/var/www/site/templates"
+webroot = "/var/www/site/webroot"

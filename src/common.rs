@@ -17,7 +17,7 @@ use log::{debug, trace};
 
 #[cfg(target_family = "unix")]
 pub fn str_to_ro_file<P: AsRef<Path>>(content: &str, dest: P) -> Result<(), Box<dyn std::error::Error>> { 
-    debug!("Writing protected file");
+    debug!("Writing protected file: {}", &dest.as_ref().display());
     use std::os::unix::fs::OpenOptionsExt;
     let mut options = OpenOptions::new();
     options.create(true);
@@ -36,7 +36,7 @@ pub fn str_to_ro_file<P: AsRef<Path>>(content: &str, dest: P) -> Result<(), Box<
 
 #[cfg(target_family = "windows")]
 pub fn str_to_ro_file<P: AsRef<Path>>(content: &str, dest: P) -> Result<(), Box<dyn std::error::Error>> {
-    debug!("Writing protected file");
+    debug!("Writing protected file: {}", &dest.as_ref().display());
     trace!("Opening '{}' to write", &dest.as_ref().display());
     let mut ro_file = File::create(dest)?;
     ro_file.write_all(content.as_bytes())?;
