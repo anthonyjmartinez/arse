@@ -20,6 +20,15 @@ and flexible base for serving sites using:
 
 Documentation can be found [here](https://docs.rs/arse/).
 
+## Path to 1.0
+
+- [x] Dynamic route handling
+- [x] Provide meaningful logging of library and binary activites at appropriate levels
+- [ ] Documentation of full public API
+- [ ] Support custom Tera templates
+- [ ] Context-specific Errors and handling
+- [ ] Administration portal for site management 
+
 ### License
 
 Licensed under either of
