@@ -1,10 +1,12 @@
-// A Rust Site Engine
-// Copyright 2020-2021 Anthony Martinez
-//
-// Licensed under the Apache License, Version 2.0, <LICENSE-APACHE or
-// http://apache.org/licenses/LICENSE-2.0> or the MIT license <LICENSE-MIT or
-// http://opensource.org/licenses/MIT>, at your option. This file may not be
-// copied, modified, or distributed except according to those terms.
+/*
+A Rust Site Engine
+Copyright 2020-2021 Anthony Martinez
+
+Licensed under the Apache License, Version 2.0, <LICENSE-APACHE or
+http://apache.org/licenses/LICENSE-2.0> or the MIT license <LICENSE-MIT or
+http://opensource.org/licenses/MIT>, at your option. This file may not be
+copied, modified, or distributed except according to those terms.
+*/
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -12,11 +14,13 @@ use std::sync::Arc;
 use super::config::AppConfig;
 use super::common;
 
+use log::{debug, trace};
 use pulldown_cmark::{Parser, html};
 use tera::{Tera, Context};
 
 mod default;
 
+#[derive(Debug)]
 pub struct Engine {
     pub app: Arc<AppConfig>,
     pub topic_slug: String,
@@ -26,8 +30,9 @@ pub struct Engine {
 
 impl Engine {
     pub fn new(a: Arc<AppConfig>, ts: &str, tmpl: &str, inst: Tera) -> Engine {
+	trace!("Loading rendering engine");
 	Engine {
-	    app: a.clone(),
+	    app: a,
 	    topic_slug: ts.to_owned(),
 	    template: tmpl.to_owned(),
 	    instance: inst
@@ -35,24 +40,28 @@ impl Engine {
     }
 }
 
-pub fn load_default_template() -> Result<Tera, Box<dyn std::error::Error>> {
+pub(crate) fn load_default_template() -> Result<Tera, Box<dyn std::error::Error>> {
+    trace!("Loading default rendering template");
     let mut tera = Tera::default();
     tera.add_raw_template("default.tmpl", default::TEMPLATE)?;
     Ok(tera)
 }
 
-pub fn render_topic(engine: Engine) -> Result<String, Box<dyn std::error::Error>> {
-    let blog = &engine.app.blog;
+pub(crate) fn render_topic(engine: Engine) -> Result<String, Box<dyn std::error::Error>> {
+    debug!("Rendering topic: '{}'", &engine.topic_slug);
+    let site = &engine.app.site;
     let topic_data = load_topic(&engine)?;
     let mut context = Context::new();
-    context.insert("blog", blog);
+    context.insert("site", site);
     context.insert("posts", &topic_data);
     let output = engine.instance.render(&engine.template, &context)?;
 
+    trace!("Rendered content for topic: {}\n{}", &engine.topic_slug, output);
     Ok(output)
 }
 
 fn load_topic(engine: &Engine) -> Result<Vec<String>, Box<dyn std::error::Error>> {
+    trace!("Loading topic content for '{}'", &engine.topic_slug);
     let topic_path = Path::new(&engine.app.docpaths.webroot).join(&engine.topic_slug).join("posts");
     let pat = format!("{}/*.md", topic_path.display());
     let paths = common::path_matches(&pat)?;
@@ -60,8 +69,10 @@ fn load_topic(engine: &Engine) -> Result<Vec<String>, Box<dyn std::error::Error>
 }
 
 fn read_to_html(paths: Vec<PathBuf>) -> Result<Vec<String>, Box<dyn std::error::Error>> {
+    debug!("Rendering Markdown to HTML");
     let mut contents: Vec<String> = Vec::new();
     for path in paths {
+	trace!("Rendering {} to HTML", &path.display());
 	let buf = std::fs::read_to_string(path)?;
 	let parser = Parser::new(&buf);
 	let mut html_output = String::new();
@@ -77,7 +88,6 @@ mod tests {
     use super::*;
     use std::fs::File;
     use std::io::prelude::*;
-    use tempfile;
 
     #[test]
     fn check_default_template() {
@@ -88,7 +98,7 @@ mod tests {
     #[test]
     fn check_render_topic() {
 	let dir = tempfile::tempdir().unwrap();
-	let mut src: &[u8] = b"Blog Name\nAuthor Name\nOne, Two, Three, And More\nadmin\n";
+	let mut src: &[u8] = b"Site Name\nAuthor Name\nOne, Two, Three, And More\nadmin\n";
 	let instance = load_default_template().unwrap();
 	let config = AppConfig::generate(&dir, &mut src).unwrap();
 	let config = Arc::new(config);
@@ -105,10 +115,10 @@ Very cool, but maybe not super useful
 Super Wow!
 "#;
 	
-	let mut f = File::create(&dir.path().join("blog/webroot/one/posts/post1.md")).unwrap();
+	let mut f = File::create(&dir.path().join("site/webroot/one/posts/post1.md")).unwrap();
 	f.write_all(&post.as_bytes()).unwrap();
 
-	let mut f = File::create(&dir.path().join("blog/webroot/one/posts/post2.md")).unwrap();
+	let mut f = File::create(&dir.path().join("site/webroot/one/posts/post2.md")).unwrap();
 	f.write_all(&post2.as_bytes()).unwrap();
 
 	let page = render_topic(engine).unwrap();
