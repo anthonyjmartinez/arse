@@ -10,15 +10,18 @@ copied, modified, or distributed except according to those terms.
 
 use log::{debug, error};
 
+use super::{Result, Error};
+
 /**
 TODO Document
 */
-pub fn generate_secret(len: usize) -> Result<String, Box<dyn std::error::Error>> {
+pub fn generate_secret(len: usize) -> Result<String> {
     use rand::{distributions::Alphanumeric, thread_rng, Rng};
+    let min = 32;
 
-    if len < 32 {
+    if len < min {
         error!("Attempting to use password < 32ch.");
-        Err(From::from("Random passwords shorter than 32ch are useless"))
+	Err(Error::WeakSecret { min })
     } else {
         let pass: String = thread_rng()
             .sample_iter(&Alphanumeric)
@@ -33,7 +36,7 @@ pub fn generate_secret(len: usize) -> Result<String, Box<dyn std::error::Error>>
 /**
 TODO Document
 */
-pub fn generate_argon2_phc(secret: &str) -> Result<String, Box<dyn std::error::Error>> {
+pub fn generate_argon2_phc(secret: &str) -> Result<String> {
     use argon2::{
         password_hash::{PasswordHasher, SaltString},
         Argon2,
@@ -43,14 +46,17 @@ pub fn generate_argon2_phc(secret: &str) -> Result<String, Box<dyn std::error::E
     let secret = secret.as_bytes();
     let salt = SaltString::generate(&mut OsRng);
     let argon2 = Argon2::default();
-    let argon2_phc: Result<String, Box<dyn std::error::Error>>;
+    let argon2_phc: Result<String>;
 
-    if let Ok(phc) = argon2.hash_password_simple(secret, salt.as_ref()) {
-        debug!("Created Argon2 PHC string");
-        argon2_phc = Ok(phc.to_string());
-    } else {
-        error!("Failed to create Argon2 PHC");
-        argon2_phc = Err(From::from("Failed to hash password"));
+    match argon2.hash_password_simple(secret, salt.as_ref()) {
+        Ok(phc) => {
+            debug!("Created Argon2 PHC string");
+            argon2_phc = Ok(phc.to_string());
+        }
+        Err(_) => {
+            error!("Failed to create Argon2 PHC");
+            argon2_phc = Err(Error::HasherError);
+        }
     }
 
     argon2_phc

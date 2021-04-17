@@ -8,12 +8,14 @@ http://opensource.org/licenses/MIT>, at your option. This file may not be
 copied, modified, or distributed except according to those terms.
 */
 
-pub mod auth;
-pub mod config;
-pub mod common;
-pub mod render;
-pub mod routes;
-pub mod errors;
+use snafu::Snafu;
 
-pub type Error = crate::errors::Error;
-pub type Result<T, E = Error> = std::result::Result<T, E>;
+#[derive(Debug, Snafu)]
+pub enum Error {
+    #[snafu(display("Attempted to generate a secret with less than {} characters", min))]
+    WeakSecret { min: usize },
+
+    #[snafu(display("Failed to create Argon2 PHC"))]
+    HasherError,
+}
+
