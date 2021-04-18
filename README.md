@@ -18,9 +18,8 @@ and flexible base for serving sites using:
 
 - [x] Dynamic route handling
 - [x] Provide meaningful logging of library and binary activites at appropriate levels
-- [ ] Documentation of full public API
+- [x] Context-specific Errors and handling
 - [ ] Support custom Tera templates
-- [ ] Context-specific Errors and handling
 - [ ] Administration portal for site management 
 
 ### License
