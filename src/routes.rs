@@ -22,7 +22,7 @@ use super::config::AppConfig;
 use super::render;
 
 
-pub fn router(app: Arc<AppConfig>) -> Router<Body, Infallible> {
+pub(crate) fn router(app: Arc<AppConfig>) -> Router<Body, Infallible> {
     debug!("Building site router");
     Router::builder()
         .data(app)

@@ -8,20 +8,23 @@ http://opensource.org/licenses/MIT>, at your option. This file may not be
 copied, modified, or distributed except according to those terms.
 */
 
+use std::usize;
+
 use log::{debug, error};
 
-use super::{Result, Error};
+use super::{anyhow, Result};
 
 /**
 TODO Document
 */
-pub fn generate_secret(len: usize) -> Result<String> {
+pub(crate) fn generate_secret(len: usize) -> Result<String> {
     use rand::{distributions::Alphanumeric, thread_rng, Rng};
-    let min = 32;
+    const MIN: usize = 32;
 
-    if len < min {
-        error!("Attempting to use password < 32ch.");
-	Err(Error::WeakSecret { min })
+    if len < MIN {
+	let msg = format!("Attempting to create secret with < {}ch", &MIN);
+        error!("{}", &msg);
+	Err(anyhow!("{}", msg))
     } else {
         let pass: String = thread_rng()
             .sample_iter(&Alphanumeric)
@@ -36,7 +39,7 @@ pub fn generate_secret(len: usize) -> Result<String> {
 /**
 TODO Document
 */
-pub fn generate_argon2_phc(secret: &str) -> Result<String> {
+pub(crate) fn generate_argon2_phc(secret: &str) -> Result<String> {
     use argon2::{
         password_hash::{PasswordHasher, SaltString},
         Argon2,
@@ -50,19 +53,21 @@ pub fn generate_argon2_phc(secret: &str) -> Result<String> {
 
     match argon2.hash_password_simple(secret, salt.as_ref()) {
         Ok(phc) => {
-            debug!("Created Argon2 PHC string");
+	    let msg = "Created Argon2 PHC string";
+            debug!("{}", msg);
             argon2_phc = Ok(phc.to_string());
         }
         Err(_) => {
-            error!("Failed to create Argon2 PHC");
-            argon2_phc = Err(Error::HasherError);
+	    let msg = "Failed to create Argon2 PHC";
+            error!("{}", &msg);
+            argon2_phc = Err(anyhow!("{}", msg));
         }
     }
 
     argon2_phc
 }
 
-pub use data_encoding::BASE32_NOPAD;
+pub(crate) use data_encoding::BASE32_NOPAD;
 
 #[cfg(test)]
 mod tests {

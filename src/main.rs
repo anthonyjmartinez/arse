@@ -11,13 +11,19 @@ copied, modified, or distributed except according to those terms.
 use std::net::SocketAddr;
 use std::sync::Arc;
 
-use arse::*;
+use anyhow::{anyhow, Context, Result};
 use log::{info, error};
 use hyper::Server;
 use routerify::RouterService;
 
+mod auth;
+mod config;
+mod common;
+mod render;
+mod routes;
+
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+async fn main() -> Result<()> {
     let config = config::load()?;
     let app = Arc::new(config);
     info!("Configuration loaded");

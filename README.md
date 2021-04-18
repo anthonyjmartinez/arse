@@ -8,17 +8,11 @@ and flexible base for serving sites using:
 * [routerify](https://crates.io/crates/routerify) to serve the site
 * [simplecss](https://simplecss.org) for default styling
 
-## Binary
+## Usage
 
 * Run an existing site given the path to its config TOML: `arse run config.toml`
 * Create and run a new site from user input: `arse new`
 * Logging verbosity can be increased with `-v` or `-vv`, the default level is `INFO`.
-
-## Library
-
-`arse` can be used as a library to extend functionality as the user sees fit.
-
-Documentation can be found [here](https://docs.rs/arse/).
 
 ## Path to 1.0
 

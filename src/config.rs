@@ -19,6 +19,7 @@ use serde::{Serialize, Deserialize};
 
 use super::auth;
 use super::common;
+use super::{anyhow, Context, Result};
 
 fn args() -> App<'static, 'static> {
     App::new("A Rust Site Engine")
@@ -44,8 +45,8 @@ fn args() -> App<'static, 'static> {
 
 /// TODO Document this public function
 /// And Include an Example of its Use
-pub fn load() -> Result<AppConfig, Box<dyn std::error::Error>> {
-    let config: Result<AppConfig, Box<dyn std::error::Error>>;
+pub(crate) fn load() -> Result<AppConfig> {
+    let config: Result<AppConfig>;
     let matches = args().get_matches();
 
     // Create a Config with ISO timestamps
@@ -55,9 +56,9 @@ pub fn load() -> Result<AppConfig, Box<dyn std::error::Error>> {
 
     // After this block locking is configured at the specified level
     match matches.occurrences_of("verbosity") {
-	0 => SimpleLogger::init(log::LevelFilter::Info, log_config)?,
-	1 => SimpleLogger::init(log::LevelFilter::Debug, log_config)?,
-	_ => SimpleLogger::init(log::LevelFilter::Trace, log_config)?,
+	0 => SimpleLogger::init(log::LevelFilter::Info, log_config).context("failed to initialize logger at level - INFO")?,
+	1 => SimpleLogger::init(log::LevelFilter::Debug, log_config).context("failed to initialize logger at level - DEBUG")?,
+	_ => SimpleLogger::init(log::LevelFilter::Trace, log_config).context("failed to initialize logger at level - TRACE")?,
     }
 
     info!("Logging started");
@@ -70,18 +71,18 @@ pub fn load() -> Result<AppConfig, Box<dyn std::error::Error>> {
 	trace!("Application called with `new` subcommand - creating config from user input");
 	let reader = std::io::stdin();
 	let mut reader = reader.lock();
-	let current_path = std::env::current_dir()?;
+	let current_path = std::env::current_dir().context("failed to get current working directory")?;
 	config = AppConfig::generate(current_path, &mut reader);
     } else {
 	let msg = "Unable to load configuration".to_owned();
 	error!("{}", &msg);
-	config = Err(From::from(msg));
+	config = Err(anyhow!("{}", msg));
     }
 
     config
 }
 
-fn runner_config(m: ArgMatches) -> Result<AppConfig, Box<dyn std::error::Error>> {
+fn runner_config(m: ArgMatches) -> Result<AppConfig> {
     if let Some(run) = m.subcommand_matches("run") {
 	let value = run.value_of("config").unwrap();
 	let config = AppConfig::from_path(value)?;
@@ -89,14 +90,15 @@ fn runner_config(m: ArgMatches) -> Result<AppConfig, Box<dyn std::error::Error>>
     } else {
 	let msg = "Failed to read arguments for 'run' subcommand".to_owned();
 	error!("{}", &msg);
-	Err(From::from(msg))
+	Err(anyhow!("{}", msg))
     }
 }
 
-fn get_input<R: BufRead>(prompt: &str, reader: &mut R) -> Result<String, Box<dyn std::error::Error>> {
+fn get_input<R: BufRead>(prompt: &str, reader: &mut R) -> Result<String> {
     let mut buf = String::new();
     println!("{}", prompt);
-    reader.read_line(&mut buf)?;
+    reader.read_line(&mut buf)
+        .context("failed reading input from user")?;
     let buf = String::from(buf
 			   .trim_start_matches(char::is_whitespace)
 			   .trim_end_matches(char::is_whitespace));
@@ -117,14 +119,14 @@ fn csv_to_vec(csv: &str) -> Vec<String> {
 
 /// TODO Document
 #[derive(Debug, Deserialize, Serialize, PartialEq)]
-pub struct Site {
+pub(crate) struct Site {
     pub name: String,
     pub author: String,
     pub topics: Vec<String>,
 }
 
 impl Site {
-    pub fn new_from_input<R: BufRead>(reader: &mut R) -> Result<Site, Box<dyn std::error::Error>> {
+    pub(crate) fn new_from_input<R: BufRead>(reader: &mut R) -> Result<Site> {
 	let name = get_input("Please enter a name for the site: ", reader)?;
 	let author = get_input("Please enter the site author's name: ", reader)?;
 	let topics = get_input("Please enter comma-separated site topics: ", reader)?;
@@ -138,14 +140,14 @@ impl Site {
 
 /// TODO Document
 #[derive(Debug, Deserialize, Serialize, PartialEq)]
-pub struct Credentials {
+pub(crate) struct Credentials {
     pub user: String,
     pub password: String,
     pub token: String,
 }
 
 impl Credentials {
-    pub fn new_from_input<P: AsRef<Path>, R: BufRead>(dir: P, reader: &mut R) -> Result<Credentials, Box<dyn std::error::Error>> {
+    pub(crate) fn new_from_input<P: AsRef<Path>, R: BufRead>(dir: P, reader: &mut R) -> Result<Credentials> {
 	let user = get_input("Please enter an username for the site admin: ", reader)?;
 	const PASSWORD_LEN: usize = 32;
 	let password = auth::generate_secret(PASSWORD_LEN)?;
@@ -170,13 +172,13 @@ impl Credentials {
 
 /// TODO Document
 #[derive(Debug, Deserialize, Serialize, PartialEq)]
-pub struct DocPaths {
+pub(crate) struct DocPaths {
     pub templates: String,
     pub webroot: String,
 }
 
 impl DocPaths {
-    pub fn new<P: AsRef<Path>>(dir: P) -> Result<DocPaths, Box<dyn std::error::Error>> {
+    pub(crate) fn new<P: AsRef<Path>>(dir: P) -> DocPaths {
 	debug!("Creating site DocPaths");
 	let dir = dir.as_ref().display();
 	let templates = format!("{}/site/templates", dir); 
@@ -184,32 +186,34 @@ impl DocPaths {
 	let docpaths = DocPaths { templates, webroot };
 
 	trace!("Site DocPaths: {:?}", docpaths);
-	Ok(docpaths)
+	docpaths
     }
 }
 
 /// TODO Document
 #[derive(Debug, Deserialize, Serialize, PartialEq)]
-pub struct AppConfig {
+pub(crate) struct AppConfig {
     pub site: Site,
     pub creds: Credentials,
     pub docpaths: DocPaths,
 }
 
 impl AppConfig {
-    pub fn from_path<T: AsRef<Path>>(config: T) -> Result<AppConfig, Box<dyn std::error::Error>> {
+    pub(crate) fn from_path<T: AsRef<Path>>(config: T) -> Result<AppConfig> {
 	debug!("Loading site configuration from {}", &config.as_ref().display());
-	let config = std::fs::read_to_string(config)?;
+	let config_string = std::fs::read_to_string(&config)
+	    .with_context(|| format!("failed reading '{}' to string", &config.as_ref().display()))?;
 
 	trace!("Parsing configuration TOML");
-	let app_config: AppConfig = toml::from_str(&config)?;
+	let app_config: AppConfig = toml::from_str(&config_string)
+            .context("failed to parse TOML")?;
 
 	Ok(app_config)
     }
 
-    pub fn generate<P: AsRef<Path>, R: BufRead>(dir: P, reader: &mut R) -> Result<AppConfig, Box<dyn std::error::Error>> {
+    pub(crate) fn generate<P: AsRef<Path>, R: BufRead>(dir: P, reader: &mut R) -> Result<AppConfig> {
 	debug!("Generating new site configuration");
-	let docpaths = DocPaths::new(&dir)?;
+	let docpaths = DocPaths::new(&dir);
 	let site = Site::new_from_input(reader)?;
 	let creds = Credentials::new_from_input(&dir, reader)?;
 	
@@ -219,13 +223,15 @@ impl AppConfig {
 	    docpaths,
 	};
 
-	config.create_paths()?;
-	config.write(&dir)?;
+	config.create_paths()
+	    .context("failed while creating site paths")?;
+	config.write(&dir)
+	    .context("failed to write site config to disk")?;
 
 	Ok(config)
     }
 
-    fn create_paths(&self) -> Result<(), Box<dyn std::error::Error>> {
+    fn create_paths(&self) -> Result<()> {
 	debug!("Creating site filesystem tree");
 	create_dir_all(&self.docpaths.templates)?;
 	create_dir_all(format!("{}/static/ext", &self.docpaths.webroot))?;
@@ -241,9 +247,9 @@ impl AppConfig {
 	Ok(())
     }
 
-    fn write<P: AsRef<Path>>(&self, dir: P) -> Result<(), Box<dyn std::error::Error>> {
+    fn write<P: AsRef<Path>>(&self, dir: P) -> Result<()> {
 	debug!("Writing site configuration to disk");
-	let config = toml::to_string_pretty(&self)?;
+	let config = toml::to_string_pretty(&self).context("failure creating TOML")?;
 	let conf_path = &dir.as_ref().join("config.toml");
 	common::str_to_ro_file(&config, &conf_path)?;
 	Ok(())
