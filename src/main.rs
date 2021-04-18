@@ -11,7 +11,7 @@ copied, modified, or distributed except according to those terms.
 use std::net::SocketAddr;
 use std::sync::Arc;
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, Context, Error, Result};
 use log::{info, error};
 use hyper::Server;
 use routerify::RouterService;
