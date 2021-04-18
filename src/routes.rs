@@ -14,7 +14,6 @@ use std::io::prelude::*;
 use std::path::Path;
 use std::sync::Arc;
 
-use anyhow::private::kind::BoxedKind;
 use hyper::{Body, Request, Response, StatusCode};
 use log::{debug, error, info};
 use routerify::{prelude::*, Router, RouteError};
