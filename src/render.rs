@@ -13,15 +13,17 @@ use std::sync::Arc;
 
 use super::config::AppConfig;
 use super::common;
+use super::{Context, Result};
 
 use log::{debug, trace};
 use pulldown_cmark::{Parser, html};
-use tera::{Tera, Context};
+use tera::Tera;
+use tera::Context as TemplateContext;
 
 mod default;
 
 #[derive(Debug)]
-pub struct Engine {
+pub(crate) struct Engine {
     pub app: Arc<AppConfig>,
     pub topic_slug: String,
     pub template: String,
@@ -29,7 +31,7 @@ pub struct Engine {
 }
 
 impl Engine {
-    pub fn new(a: Arc<AppConfig>, ts: &str, tmpl: &str, inst: Tera) -> Engine {
+    pub(crate) fn new(a: Arc<AppConfig>, ts: &str, tmpl: &str, inst: Tera) -> Engine {
 	trace!("Loading rendering engine");
 	Engine {
 	    app: a,
@@ -40,27 +42,29 @@ impl Engine {
     }
 }
 
-pub(crate) fn load_default_template() -> Result<Tera, Box<dyn std::error::Error>> {
+pub(crate) fn load_default_template() -> Result<Tera> {
     trace!("Loading default rendering template");
     let mut tera = Tera::default();
-    tera.add_raw_template("default.tmpl", default::TEMPLATE)?;
+    tera.add_raw_template("default.tmpl", default::TEMPLATE)
+        .context("failure adding default template")?;
     Ok(tera)
 }
 
-pub(crate) fn render_topic(engine: Engine) -> Result<String, Box<dyn std::error::Error>> {
+pub(crate) fn render_topic(engine: Engine) -> Result<String> {
     debug!("Rendering topic: '{}'", &engine.topic_slug);
     let site = &engine.app.site;
     let topic_data = load_topic(&engine)?;
-    let mut context = Context::new();
+    let mut context = TemplateContext::new();
     context.insert("site", site);
     context.insert("posts", &topic_data);
-    let output = engine.instance.render(&engine.template, &context)?;
+    let output = engine.instance.render(&engine.template, &context)
+        .with_context(|| format!("failed rendering topic: {}", &engine.topic_slug))?;
 
     trace!("Rendered content for topic: {}\n{}", &engine.topic_slug, output);
     Ok(output)
 }
 
-fn load_topic(engine: &Engine) -> Result<Vec<String>, Box<dyn std::error::Error>> {
+fn load_topic(engine: &Engine) -> Result<Vec<String>> {
     trace!("Loading topic content for '{}'", &engine.topic_slug);
     let topic_path = Path::new(&engine.app.docpaths.webroot).join(&engine.topic_slug).join("posts");
     let pat = format!("{}/*.md", topic_path.display());
@@ -68,12 +72,13 @@ fn load_topic(engine: &Engine) -> Result<Vec<String>, Box<dyn std::error::Error>
     read_to_html(paths)
 }
 
-fn read_to_html(paths: Vec<PathBuf>) -> Result<Vec<String>, Box<dyn std::error::Error>> {
+fn read_to_html(paths: Vec<PathBuf>) -> Result<Vec<String>> {
     debug!("Rendering Markdown to HTML");
     let mut contents: Vec<String> = Vec::new();
     for path in paths {
 	trace!("Rendering {} to HTML", &path.display());
-	let buf = std::fs::read_to_string(path)?;
+	let buf = std::fs::read_to_string(&path)
+	    .with_context(|| format!("failure reading '{}' to string", &path.display()))?;
 	let parser = Parser::new(&buf);
 	let mut html_output = String::new();
 	html::push_html(&mut html_output, parser);

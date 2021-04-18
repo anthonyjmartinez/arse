@@ -8,17 +8,23 @@ http://opensource.org/licenses/MIT>, at your option. This file may not be
 copied, modified, or distributed except according to those terms.
 */
 
+use std::usize;
+
 use log::{debug, error};
+
+use super::{anyhow, Result};
 
 /**
 TODO Document
 */
-pub fn generate_secret(len: usize) -> Result<String, Box<dyn std::error::Error>> {
+pub(crate) fn generate_secret(len: usize) -> Result<String> {
     use rand::{distributions::Alphanumeric, thread_rng, Rng};
+    const MIN: usize = 32;
 
-    if len < 32 {
-        error!("Attempting to use password < 32ch.");
-        Err(From::from("Random passwords shorter than 32ch are useless"))
+    if len < MIN {
+	let msg = format!("Attempting to create secret with < {}ch", &MIN);
+        error!("{}", &msg);
+	Err(anyhow!("{}", msg))
     } else {
         let pass: String = thread_rng()
             .sample_iter(&Alphanumeric)
@@ -33,7 +39,7 @@ pub fn generate_secret(len: usize) -> Result<String, Box<dyn std::error::Error>>
 /**
 TODO Document
 */
-pub fn generate_argon2_phc(secret: &str) -> Result<String, Box<dyn std::error::Error>> {
+pub(crate) fn generate_argon2_phc(secret: &str) -> Result<String> {
     use argon2::{
         password_hash::{PasswordHasher, SaltString},
         Argon2,
@@ -43,20 +49,25 @@ pub fn generate_argon2_phc(secret: &str) -> Result<String, Box<dyn std::error::E
     let secret = secret.as_bytes();
     let salt = SaltString::generate(&mut OsRng);
     let argon2 = Argon2::default();
-    let argon2_phc: Result<String, Box<dyn std::error::Error>>;
+    let argon2_phc: Result<String>;
 
-    if let Ok(phc) = argon2.hash_password_simple(secret, salt.as_ref()) {
-        debug!("Created Argon2 PHC string");
-        argon2_phc = Ok(phc.to_string());
-    } else {
-        error!("Failed to create Argon2 PHC");
-        argon2_phc = Err(From::from("Failed to hash password"));
+    match argon2.hash_password_simple(secret, salt.as_ref()) {
+        Ok(phc) => {
+	    let msg = "Created Argon2 PHC string";
+            debug!("{}", msg);
+            argon2_phc = Ok(phc.to_string());
+        }
+        Err(_) => {
+	    let msg = "Failed to create Argon2 PHC";
+            error!("{}", &msg);
+            argon2_phc = Err(anyhow!("{}", msg));
+        }
     }
 
     argon2_phc
 }
 
-pub use data_encoding::BASE32_NOPAD;
+pub(crate) use data_encoding::BASE32_NOPAD;
 
 #[cfg(test)]
 mod tests {

@@ -8,21 +8,22 @@ http://opensource.org/licenses/MIT>, at your option. This file may not be
 copied, modified, or distributed except according to those terms.
 */
 
-use std::convert::Infallible;
+//use std::convert::Infallible;
 use std::fs::File;
 use std::io::prelude::*;
 use std::path::Path;
 use std::sync::Arc;
 
-use hyper::{Body, Request, Response};
-use log::{debug, info};
-use routerify::{prelude::*, Router};
+use hyper::{Body, Request, Response, StatusCode};
+use log::{debug, error, info};
+use routerify::{prelude::*, Router, RouteError};
 
 use super::config::AppConfig;
 use super::render;
+use super::{Context, Error, Result};
 
 
-pub fn router(app: Arc<AppConfig>) -> Router<Body, Infallible> {
+pub(crate) fn router(app: Arc<AppConfig>) -> Router<Body, Error> {
     debug!("Building site router");
     Router::builder()
         .data(app)
@@ -30,19 +31,31 @@ pub fn router(app: Arc<AppConfig>) -> Router<Body, Infallible> {
         .get("/:topic", topic_handler)
         .get("/:topic/ext/:fname", topic_assets)
         .get("/static/:fname", static_assets)
+        .err_handler(error_handler)
         .build()
         .unwrap()
 }
 
+/// Error handler
+async fn error_handler(err: RouteError) -> Response<Body> {
+    // TODO: use the correct status codes given specific context
+    error!("{}", err);
+
+    Response::builder()
+        .status(StatusCode::INTERNAL_SERVER_ERROR)
+        .body(Body::from("Internal Error"))
+        .unwrap()
+}
+
 /// Handler for "/"
-async fn index_handler(req: Request<Body>) -> Result<Response<Body>, Infallible> {
+async fn index_handler(req: Request<Body>) -> Result<Response<Body>> {
     info!("Handling request to '/'");
     let app = req.data::<Arc<AppConfig>>().unwrap();
     topic_posts(app.clone(), "main".to_owned()).await
 }
 
 /// Handler for "/:topic"
-async fn topic_handler(req: Request<Body>) -> Result<Response<Body>, Infallible> {
+async fn topic_handler(req: Request<Body>) -> Result<Response<Body>> {
     let app = req.data::<Arc<AppConfig>>().unwrap();
     let topic = req.param("topic").unwrap();
     info!("Handling request to '/{}'", &topic);
@@ -50,35 +63,39 @@ async fn topic_handler(req: Request<Body>) -> Result<Response<Body>, Infallible>
 }
 
 /// Called by topic_handler to dynamically generate topic pages 
-async fn topic_posts(app: Arc<AppConfig>, topic: String) -> Result<Response<Body>, Infallible> { 
-    let instance = render::load_default_template().unwrap();
+async fn topic_posts(app: Arc<AppConfig>, topic: String) -> Result<Response<Body>> { 
+    let instance = render::load_default_template()
+        .context("failed to load template")?;
     let engine = render::Engine::new(app, &topic, "default.tmpl", instance);
-    let output = render::render_topic(engine).unwrap();
+    let output = render::render_topic(engine)
+        .with_context(|| format!("failed to render topic: {}", &topic))?;
     Ok(Response::new(Body::from(output)))
 }
 
 /// Handler for "/static/:fname"
-async fn static_assets(req: Request<Body>) -> Result<Response<Body>, Infallible> { 
+async fn static_assets(req: Request<Body>) -> Result<Response<Body>> { 
     let app = req.data::<Arc<AppConfig>>().unwrap();
     let resource = req.param("fname").unwrap();
     info!("Handling static asset: '/static/{}'", &resource);
     let static_path = Path::new(&app.docpaths.webroot).join("static").join(resource);
-    let mut f = File::open(static_path).unwrap();
+    let mut f = File::open(&static_path)
+        .with_context(|| format!("failed to open '{}'", &static_path.display()))?;
     let mut buf = Vec::new();
-    f.read_to_end(&mut buf).unwrap();
+    f.read_to_end(&mut buf).context("failed to read to buffer")?;
     Ok(Response::new(Body::from(buf)))
 }
 
 /// Handler for "/:topic/ext/:fname"
-async fn topic_assets(req: Request<Body>) -> Result<Response<Body>, Infallible> { 
+async fn topic_assets(req: Request<Body>) -> Result<Response<Body>> { 
     let app = req.data::<Arc<AppConfig>>().unwrap();
     let topic = req.param("topic").unwrap();
     let resource = req.param("fname").unwrap();
     info!("Handling static asset: '/{}/ext/{}'", &topic, &resource);
     let topic_asset_path = Path::new(&app.docpaths.webroot).join(topic).join("ext").join(resource);
-    let mut f = File::open(topic_asset_path).unwrap();
+    let mut f = File::open(&topic_asset_path)
+        .with_context(|| format!("failed to open '{}'", &topic_asset_path.display()))?;
     let mut buf = Vec::new();
-    f.read_to_end(&mut buf).unwrap();
+    f.read_to_end(&mut buf).context("failed to read to buffer")?;
     Ok(Response::new(Body::from(buf)))
 }
 
