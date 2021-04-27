@@ -27,8 +27,11 @@ async fn main() -> Result<()> {
     let config = config::load()?;
     let app = Arc::new(config);
     info!("Configuration loaded");
+
+    let engine = Arc::new(render::Engine::new(app));
+    info!("Rendering Engine loaded");
     
-    let router = routes::router(app.clone());
+    let router = routes::router(engine);
     info!("Route handlers loaded");
 
     let service = RouterService::new(router).unwrap();

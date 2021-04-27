@@ -11,20 +11,24 @@
 <center>
 <h1>{{ site.name }}</h1>
 <nav>
-<a href="./">Home</a>
+<a href="/">Home</a>
 {%- for topic in site.topics %}
-<a href="./{{ topic | slugify }}">{{ topic }}</a>
+<a href="/{{ topic | slugify }}">{{ topic }}</a>
 {%- endfor -%}
 </nav>
 </center>
 </header>
 <main>
+{% if post %}
+{{ post }}
+{% elif posts %}
 {% if posts | length == 0 %}
 <h3>Coming Soon!</h3>
 {% else %}
 {%- for post in posts %}
 {{ post }}
 {%- endfor -%}
+{% endif %}
 {% endif %}
 </main>
 <footer>
