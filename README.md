@@ -25,7 +25,10 @@ at runtime.
 The following elements are available within the Tera context for rendering:
 
 * `site`, mapping directly to the fields available in the `site` configuration section
-* `posts`, a lexically reverse-sorted list of HTML rendered from markdown in `site/:topic/posts/*`
+* `post`, available when serving single-posts from from `site/:topic/posts/:post.md`
+  * Used when serving `GET /:topic/posts/:post` where `:post` is the markdown filename minus its extension
+* `posts`, a lexically reverse-sorted list of HTML rendered from markdown in `site/:topic/posts/*.md`
+  * Used when serving `GET /:topic`
 
 ## Path to 1.0
 
