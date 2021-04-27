@@ -14,12 +14,25 @@ and flexible base for serving sites using:
 * Create and run a new site from user input: `arse new`
 * Logging verbosity can be increased with `-v` or `-vv`, the default level is `INFO`.
 
+### Rendering and Styling
+
+A default template, `default.tmpl`, is provided statically within the binary. To change the Tera
+template, add your custom template to the templates directory referenced in the `docpaths` configuration
+section of `config.toml`. Once the template is in the templates directory, change the `templates` parameter
+in the `site` configuration section to reference the template's file name. This template will now be loaded
+at runtime.
+
+The following elements are available within the Tera context for rendering:
+
+* `site`, mapping directly to the fields available in the `site` configuration section
+* `posts`, a lexically reverse-sorted list of HTML rendered from markdown in `site/:topic/posts/*`
+
 ## Path to 1.0
 
 - [x] Dynamic route handling
-- [x] Provide meaningful logging of library and binary activites at appropriate levels
+- [x] Provide meaningful logging of binary activites at appropriate levels
 - [x] Context-specific Errors and handling
-- [ ] Support custom Tera templates
+- [x] Support custom Tera templates
 - [ ] Administration portal for site management 
 
 ### License

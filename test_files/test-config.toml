@@ -1,6 +1,7 @@
 [site]
 name = "My Awesome Blog!"
 author = "Neo"
+template = "special.tmpl"
 topics = ["one", "two", "three"]
 
 [creds]
@@ -9,5 +10,5 @@ password = "123456"
 token = "my very secret token"
 
 [docpaths]
-templates = "/var/www/site/templates"
-webroot = "/var/www/site/webroot"
+templates = "test_files/site/templates"
+webroot = "test_files/site/webroot"
