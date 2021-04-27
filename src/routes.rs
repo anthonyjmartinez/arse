@@ -37,7 +37,7 @@ pub(crate) fn router(app: Arc<AppConfig>) -> Router<Body, Error> {
 }
 
 /// Error handler
-async fn error_handler(err: RouteError) -> Response<Body> {
+pub(crate) async fn error_handler(err: RouteError) -> Response<Body> {
     // TODO: use the correct status codes given specific context
     error!("{}", err);
 
@@ -64,9 +64,9 @@ async fn topic_handler(req: Request<Body>) -> Result<Response<Body>> {
 
 /// Called by topic_handler to dynamically generate topic pages 
 async fn topic_posts(app: Arc<AppConfig>, topic: String) -> Result<Response<Body>> { 
-    let instance = render::load_default_template()
+    let instance = render::load_template(app.clone())
         .context("failed to load template")?;
-    let engine = render::Engine::new(app, &topic, "default.tmpl", instance);
+    let engine = render::Engine::new(app, instance, &topic);
     let output = render::render_topic(engine)
         .with_context(|| format!("failed to render topic: {}", &topic))?;
     Ok(Response::new(Body::from(output)))
@@ -201,6 +201,53 @@ One Important Test
 	assert_eq!(topic_resp.status(), StatusCode::OK);
 	assert_eq!(topic_asset_resp.status(), StatusCode::OK);
 	assert_eq!(static_asset_resp.status(), StatusCode::OK);
+
+	let _ = tx.send(());
+    }
+
+    #[tokio::test]
+    async fn check_custom_config() {
+	let app = AppConfig::from_path("test_files/test-config.toml").unwrap() ;
+	let app = Arc::new(app);
+
+	let router = router(app.clone());
+
+	let index_request = Request::builder()
+	    .method("GET")
+	    .uri("http://localhost:11000")
+	    .body(Body::default())
+	    .unwrap();
+
+	let topic_request = Request::builder()
+	    .method("GET")
+	    .uri("http://localhost:11000/one")
+	    .body(Body::default())
+	    .unwrap();
+
+	let service = RouterService::new(router).unwrap();
+	let addr: SocketAddr = "127.0.0.1:11000".parse().unwrap();
+
+	let (tx, rx) = channel::<()>();
+
+	let server = Server::bind(&addr).serve(service);
+	
+	let graceful = server.
+	    with_graceful_shutdown(async {
+		rx.await.ok();
+	    });
+
+	tokio::spawn(async move {
+	    if let Err(e) = graceful.await {
+		println!("Encountered error: {}", e)
+	    }
+	});
+
+	let client = Client::new();
+
+	let index_resp = client.request(index_request).await.unwrap();
+	let topic_resp = client.request(topic_request).await.unwrap();
+	assert_eq!(index_resp.status(), StatusCode::OK);
+	assert_eq!(topic_resp.status(), StatusCode::OK);
 
 	let _ = tx.send(());
     }

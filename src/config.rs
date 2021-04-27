@@ -122,6 +122,7 @@ fn csv_to_vec(csv: &str) -> Vec<String> {
 pub(crate) struct Site {
     pub name: String,
     pub author: String,
+    pub template: String,
     pub topics: Vec<String>,
 }
 
@@ -131,7 +132,8 @@ impl Site {
 	let author = get_input("Please enter the site author's name: ", reader)?;
 	let topics = get_input("Please enter comma-separated site topics: ", reader)?;
 	let topics = csv_to_vec(&topics);
-	let site = Site { name, author, topics };
+	let template = "default.tmpl".to_owned();
+	let site = Site { name, author, template, topics };
 
 	trace!("Site: {:?}", site);
 	Ok(site)

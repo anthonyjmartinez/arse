@@ -25,28 +25,37 @@ mod default;
 #[derive(Debug)]
 pub(crate) struct Engine {
     pub app: Arc<AppConfig>,
+    pub instance: Tera,
     pub topic_slug: String,
-    pub template: String,
-    pub instance: Tera
 }
 
 impl Engine {
-    pub(crate) fn new(a: Arc<AppConfig>, ts: &str, tmpl: &str, inst: Tera) -> Engine {
+    pub(crate) fn new(app: Arc<AppConfig>, inst: Tera, ts: &str) -> Engine {
 	trace!("Loading rendering engine");
 	Engine {
-	    app: a,
+	    app,
+	    instance: inst,
 	    topic_slug: ts.to_owned(),
-	    template: tmpl.to_owned(),
-	    instance: inst
 	}
     }
 }
 
-pub(crate) fn load_default_template() -> Result<Tera> {
-    trace!("Loading default rendering template");
+pub(crate) fn load_template(app: Arc<AppConfig>) -> Result<Tera> {
+    trace!("Loading Tera rendering template");
     let mut tera = Tera::default();
-    tera.add_raw_template("default.tmpl", default::TEMPLATE)
-        .context("failure adding default template")?;
+    let template = app.site.template.as_str();
+    let template_dir = PathBuf::from(&app.docpaths.templates);
+
+    if let "default.tmpl" = template {
+	tera.add_raw_template("default.tmpl", default::TEMPLATE)
+	    .context("failure adding default template")?;
+    } else {
+	let template_path = template_dir.join(template);
+	tera.add_template_file(template_path, Some(template))
+	    .context("failure loading template from file")?;
+    }
+
+    trace!("Tera template loaded: {:?}", tera);
     Ok(tera)
 }
 
@@ -57,8 +66,8 @@ pub(crate) fn render_topic(engine: Engine) -> Result<String> {
     let mut context = TemplateContext::new();
     context.insert("site", site);
     context.insert("posts", &topic_data);
-    let output = engine.instance.render(&engine.template, &context)
-        .with_context(|| format!("failed rendering topic: {}", &engine.topic_slug))?;
+    let output = engine.instance.render(&site.template, &context)
+        .with_context(|| format!("failed rendering topic: {}, with Tera instance: {:?}", &engine.topic_slug, &engine.instance))?;
 
     trace!("Rendered content for topic: {}\n{}", &engine.topic_slug, output);
     Ok(output)
@@ -96,7 +105,11 @@ mod tests {
 
     #[test]
     fn check_default_template() {
-	let tera = load_default_template();
+	let dir = tempfile::tempdir().unwrap();
+	let mut src: &[u8] = b"Site Name\nAuthor Name\nOne, Two, Three, And More\nadmin\n";
+	let config = AppConfig::generate(&dir, &mut src).unwrap();
+	let config = Arc::new(config);
+	let tera = load_template(config);
 	assert!(tera.is_ok())
     }
 
@@ -104,10 +117,10 @@ mod tests {
     fn check_render_topic() {
 	let dir = tempfile::tempdir().unwrap();
 	let mut src: &[u8] = b"Site Name\nAuthor Name\nOne, Two, Three, And More\nadmin\n";
-	let instance = load_default_template().unwrap();
 	let config = AppConfig::generate(&dir, &mut src).unwrap();
 	let config = Arc::new(config);
-	let engine = Engine::new(config, "one", "default.tmpl", instance);
+	let instance = load_template(config.clone()).unwrap();
+	let engine = Engine::new(config, instance, "one");
 
 	let post = r#"
 ### Something
