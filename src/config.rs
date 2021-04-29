@@ -72,7 +72,8 @@ pub(crate) fn load() -> Result<AppConfig> {
 	let reader = std::io::stdin();
 	let mut reader = reader.lock();
 	let current_path = std::env::current_dir().context("failed to get current working directory")?;
-	config = AppConfig::generate(current_path, &mut reader);
+	let _ = AppConfig::generate(current_path, &mut reader);
+	std::process::exit(0);
     } else {
 	let msg = "Unable to load configuration".to_owned();
 	error!("{}", &msg);
@@ -231,7 +232,7 @@ impl AppConfig {
     }
 
     pub(crate) fn generate<P: AsRef<Path>, R: BufRead>(dir: P, reader: &mut R) -> Result<AppConfig> {
-	debug!("Generating new site configuration");
+	info!("Generating new site configuration");
 	let docpaths = DocPaths::new(&dir);
 	let site = Site::new_from_input(reader)?;
 	let server = Server::new();
@@ -253,7 +254,7 @@ impl AppConfig {
     }
 
     fn create_paths(&self) -> Result<()> {
-	debug!("Creating site filesystem tree");
+	info!("Creating site filesystem tree");
 	create_dir_all(&self.docpaths.templates)?;
 	create_dir_all(format!("{}/static/ext", &self.docpaths.webroot))?;
 	create_dir_all(format!("{}/main/ext", &self.docpaths.webroot))?;
@@ -269,7 +270,7 @@ impl AppConfig {
     }
 
     fn write<P: AsRef<Path>>(&self, dir: P) -> Result<()> {
-	debug!("Writing site configuration to disk");
+	info!("Writing site configuration to disk");
 	let config = toml::to_string_pretty(&self).context("failure creating TOML")?;
 	let conf_path = &dir.as_ref().join("config.toml");
 	common::str_to_ro_file(&config, &conf_path)?;
