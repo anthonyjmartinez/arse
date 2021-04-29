@@ -21,7 +21,7 @@ $ arse new
 Please enter a name for the site: 
 Example Site
 Please enter the site author's name: 
-Author Writeson
+Arthur Writeson
 Please enter comma-separated site topics: 
 one, two, three
 Please enter an username for the site admin: 
