@@ -36,6 +36,7 @@ The following elements are available within the Tera context for rendering:
 - [x] Provide meaningful logging of binary activites at appropriate levels
 - [x] Context-specific Errors and handling
 - [x] Support custom Tera templates
+- [x] Support custom bind address and port
 - [ ] Administration portal for site management 
 
 ### License

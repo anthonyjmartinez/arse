@@ -9,6 +9,10 @@ user = "admin"
 password = "123456"
 token = "my very secret token"
 
+[server]
+bind = "0.0.0.0"
+port = 8901
+
 [docpaths]
 templates = "test_files/site/templates"
 webroot = "test_files/site/webroot"

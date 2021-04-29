@@ -31,13 +31,14 @@ async fn main() -> Result<()> {
     let engine = Arc::new(render::Engine::new(app));
     info!("Rendering Engine loaded");
     
-    let router = routes::router(engine);
+    let router = routes::router(engine.clone());
     info!("Route handlers loaded");
 
     let service = RouterService::new(router).unwrap();
     info!("Service loaded");
 
-    let addr: SocketAddr = "0.0.0.0:9090".parse().unwrap();
+    let addr = format!("{}:{}", engine.app.server.bind, engine.app.server.port);
+    let addr: SocketAddr = addr.parse().unwrap();
 
     info!("Creating server on: {}", &addr);
     let server = Server::bind(&addr).serve(service);

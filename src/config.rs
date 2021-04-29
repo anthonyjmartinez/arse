@@ -142,6 +142,22 @@ impl Site {
 
 /// TODO Document
 #[derive(Debug, Deserialize, Serialize, PartialEq)]
+pub(crate) struct Server {
+    pub bind: String,
+    pub port: u16,
+}
+
+impl Server {
+    pub(crate) fn new() -> Server {
+	Server {
+	    bind: "0.0.0.0".to_owned(),
+	    port: 9090,
+	}
+    }
+}
+
+/// TODO Document
+#[derive(Debug, Deserialize, Serialize, PartialEq)]
 pub(crate) struct Credentials {
     pub user: String,
     pub password: String,
@@ -197,6 +213,7 @@ impl DocPaths {
 pub(crate) struct AppConfig {
     pub site: Site,
     pub creds: Credentials,
+    pub server: Server,
     pub docpaths: DocPaths,
 }
 
@@ -217,11 +234,13 @@ impl AppConfig {
 	debug!("Generating new site configuration");
 	let docpaths = DocPaths::new(&dir);
 	let site = Site::new_from_input(reader)?;
+	let server = Server::new();
 	let creds = Credentials::new_from_input(&dir, reader)?;
 	
 	let config = AppConfig {
 	    site,
 	    creds,
+	    server,
 	    docpaths,
 	};
 

@@ -154,40 +154,41 @@ One Important Test
 	let mut f = File::create(&dir.path().join("site/webroot/static/main-static")).unwrap();
 	f.write_all(static_asset).unwrap();
 
-	let router = router(engine);
+	let router = router(engine.clone());
 
 	let index_request = Request::builder()
 	    .method("GET")
-	    .uri("http://localhost:10000")
+	    .uri("http://localhost:9090")
 	    .body(Body::default())
 	    .unwrap();
 
 	let post_request = Request::builder()
 	    .method("GET")
-	    .uri("http://localhost:10000/one/posts/index")
+	    .uri("http://localhost:9090/one/posts/index")
 	    .body(Body::default())
 	    .unwrap();
 	
 	let topic_request = Request::builder()
 	    .method("GET")
-	    .uri("http://localhost:10000/one")
+	    .uri("http://localhost:9090/one")
 	    .body(Body::default())
 	    .unwrap();
 
 	let topic_asset_request = Request::builder()
 	    .method("GET")
-	    .uri("http://localhost:10000/one/ext/one-static")
+	    .uri("http://localhost:9090/one/ext/one-static")
 	    .body(Body::default())
 	    .unwrap();
 
 	let static_asset_request = Request::builder()
 	    .method("GET")
-	    .uri("http://localhost:10000/static/main-static")
+	    .uri("http://localhost:9090/static/main-static")
 	    .body(Body::default())
 	    .unwrap();
 
 	let service = RouterService::new(router).unwrap();
-	let addr: SocketAddr = "127.0.0.1:10000".parse().unwrap();
+	let addr = format!("{}:{}", engine.app.server.bind, engine.app.server.port);
+	let addr: SocketAddr = addr.parse().unwrap();
 
 	let (tx, rx) = channel::<()>();
 
@@ -227,28 +228,29 @@ One Important Test
 	let engine = Engine::new(Arc::new(app));
 	let engine = Arc::new(engine);
 
-	let router = router(engine);
+	let router = router(engine.clone());
 
 	let index_request = Request::builder()
 	    .method("GET")
-	    .uri("http://localhost:11000")
+	    .uri("http://localhost:8901")
 	    .body(Body::default())
 	    .unwrap();
 
 	let post_request = Request::builder()
 	    .method("GET")
-	    .uri("http://localhost:11000/one/posts/1")
+	    .uri("http://localhost:8901/one/posts/1")
 	    .body(Body::default())
 	    .unwrap();
 
 	let topic_request = Request::builder()
 	    .method("GET")
-	    .uri("http://localhost:11000/one")
+	    .uri("http://localhost:8901/one")
 	    .body(Body::default())
 	    .unwrap();
 
 	let service = RouterService::new(router).unwrap();
-	let addr: SocketAddr = "127.0.0.1:11000".parse().unwrap();
+	let addr = format!("{}:{}", engine.app.server.bind, engine.app.server.port);
+	let addr: SocketAddr = addr.parse().unwrap();
 
 	let (tx, rx) = channel::<()>();
 
