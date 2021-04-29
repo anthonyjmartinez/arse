@@ -101,9 +101,9 @@ async fn post_handler(req: Request<Body>) -> Result<Response<Body>> {
     let engine = req.data::<Arc<Engine>>().unwrap();
     let topic = req.param("topic").unwrap();
     let post = req.param("post").unwrap();
-    info!("Handling topic post: '/{}/{}'", &topic, &post);
+    info!("Handling topic post: '/{}/posts/{}'", &topic, &post);
     let output = engine.render_post(topic, post)
-        .with_context(|| format!("failed to render: '{}/{}'", topic, post))?;
+        .with_context(|| format!("failed to render: '{}/posts/{}'", topic, post))?;
     Ok(Response::new(Body::from(output)))
 }
 
