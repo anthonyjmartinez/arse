@@ -8,7 +8,6 @@ http://opensource.org/licenses/MIT>, at your option. This file may not be
 copied, modified, or distributed except according to those terms.
 */
 
-use std::fs::OpenOptions;
 use std::io::prelude::*;
 use std::path::{Path, PathBuf};
 
@@ -20,6 +19,7 @@ use super::{Context, Result};
 #[cfg(target_family = "unix")]
 pub(crate) fn str_to_ro_file<P: AsRef<Path>>(content: &str, dest: P) -> Result<()> { 
     debug!("Writing protected file: {}", &dest.as_ref().display());
+    use std::fs::OpenOptions;
     use std::os::unix::fs::OpenOptionsExt;
     let mut options = OpenOptions::new();
     options.create(true);
@@ -43,16 +43,16 @@ pub(crate) fn str_to_ro_file<P: AsRef<Path>>(content: &str, dest: P) -> Result<(
 pub fn str_to_ro_file<P: AsRef<Path>>(content: &str, dest: P) -> Result<()> {
     debug!("Writing protected file: {}", &dest.as_ref().display());
     trace!("Opening '{}' to write", &dest.as_ref().display());
-    let mut ro_file = File::create(&dest)
+    let mut ro_file = std::fs::File::create(&dest)
         .with_context(|| format!("failed to open '{}' for writing", &dest.as_ref().display()))?;
     ro_file.write_all(content.as_bytes()).
 	with_context(|| format!("failure writing '{}'", &dest.as_ref().display()))?;
-    let metadata = secret_file.metadata()
+    let metadata = ro_file.metadata()
         .with_context(|| format!("failure retrieving metadata on '{}'", &dest.as_ref().display()))?;
     let mut perms = metadata.permissions();
     if !content.ends_with('\n') {
 	ro_file.write_all(b"\n")
-	    .with_context("failure writing '{}'", &dest.as_ref().display())?;
+	    .with_context(|| format!("failure writing '{}'", &dest.as_ref().display()))?;
     }
     trace!("Content written to destination");
     trace!("Setting read-only on destination file");
