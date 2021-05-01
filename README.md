@@ -16,29 +16,21 @@ and flexible base for serving sites using:
 
 ```
 $ arse new
-2021-04-29T16:20:54.958949479+00:00 [INFO] Logging started
-2021-04-29T16:20:54.961793751+00:00 [INFO] Generating new site configuration
+2021-05-01T17:34:11.155427589+00:00 [INFO] Logging started
+2021-05-01T17:34:11.155543182+00:00 [INFO] Generating new site configuration
 Please enter a name for the site: 
 Example Site
 Please enter the site author's name: 
 Arthur Writeson
 Please enter comma-separated site topics: 
 one, two, three
-Please enter an username for the site admin: 
-admin
-2021-04-29T16:21:45.054960+00:00 [INFO] Site admin password generated
-2021-04-29T16:21:46.119118900+00:00 [INFO] Site admin TOTP token generated
-2021-04-29T16:21:46.119677411+00:00 [INFO] Creating site filesystem tree
-2021-04-29T16:21:46.121474373+00:00 [INFO] Writing site configuration to disk
+2021-05-01T17:34:26.501980660+00:00 [INFO] Creating site filesystem tree
+2021-05-01T17:34:26.504816188+00:00 [INFO] Writing site configuration to disk
 ```
 
 ### Configuration
 
-The admin password is written to `admin.pass` in plaintext, with filesystem permissions set in an effort
-to prevent unauthorized disclosure. This should be stored in a password manager and deleted as soon as
-possible. The same is true for the generated admin TOTP token which is written to `admin.totp`. Within
-the generated `config.toml`, only the TOTP token is stored as plaintext. The admin password is stored
-and loaded at runtime as an Argon2 PHC string. An example config, as generated, is shown below:
+An example config, as generated, is shown below:
 
 ```toml
 [site]
@@ -50,11 +42,6 @@ topics = [
     'two',
     'three',
 ]
-
-[creds]
-user = 'admin'
-password = '$argon2id$v=19$m=4096,t=3,p=1$FyQZJt3235EZYuz7Z45CmA$YPtQcukV6rjiXy/fPA4gQpIYalNmUe09QEOUDDz4fZ8'
-token = 'OZKWU3SWNBLG25TKNRDUCTKCGVYHS3THMJ2E4U2GINYEUM2TOBHXAVQ'
 
 [server]
 bind = '0.0.0.0'
@@ -97,7 +84,7 @@ The following elements are available within the Tera context for rendering:
 - [x] Context-specific Errors and handling
 - [x] Support custom Tera templates
 - [x] Support custom bind address and port
-- [ ] Administration portal for site management 
+- [ ] Support page caching with periodic rescan
 
 ### License
 

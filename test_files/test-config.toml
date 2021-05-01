@@ -4,11 +4,6 @@ author = "Neo"
 template = "special.tmpl"
 topics = ["one", "two", "three"]
 
-[creds]
-user = "admin"
-password = '$argon2id$v=19$m=4096,t=3,p=1$FyQZJt3235EZYuz7Z45CmA$YPtQcukV6rjiXy/fPA4gQpIYalNmUe09QEOUDDz4fZ8'
-token = 'OZKWU3SWNBLG25TKNRDUCTKCGVYHS3THMJ2E4U2GINYEUM2TOBHXAVQ'
-
 [server]
 bind = "0.0.0.0"
 port = 8901
