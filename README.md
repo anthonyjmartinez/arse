@@ -16,7 +16,16 @@ and flexible base for serving sites using:
 
 ```
 $ arse new
-### TODO UPDATE THIS WITH REAL STUFF
+2021-05-01T17:34:11.155427589+00:00 [INFO] Logging started
+2021-05-01T17:34:11.155543182+00:00 [INFO] Generating new site configuration
+Please enter a name for the site: 
+Example Site
+Please enter the site author's name: 
+Arthur Writeson
+Please enter comma-separated site topics: 
+one, two, three
+2021-05-01T17:34:26.501980660+00:00 [INFO] Creating site filesystem tree
+2021-05-01T17:34:26.504816188+00:00 [INFO] Writing site configuration to disk
 ```
 
 ### Configuration
