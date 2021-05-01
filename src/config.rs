@@ -17,7 +17,6 @@ use log::{debug, error, info, trace};
 use simplelog::{SimpleLogger, ConfigBuilder};
 use serde::{Serialize, Deserialize};
 
-use super::auth;
 use super::common;
 use super::{anyhow, Context, Result};
 
@@ -159,38 +158,6 @@ impl Server {
 
 /// TODO Document
 #[derive(Debug, Deserialize, Serialize, PartialEq)]
-pub(crate) struct Credentials {
-    pub user: String,
-    pub password: String,
-    pub token: String,
-}
-
-impl Credentials {
-    pub(crate) fn new_from_input<P: AsRef<Path>, R: BufRead>(dir: P, reader: &mut R) -> Result<Credentials> {
-	let user = get_input("Please enter an username for the site admin: ", reader)?;
-	const PASSWORD_LEN: usize = 32;
-	let password = auth::generate_secret(PASSWORD_LEN)?;
-	info!("Site admin password generated");
-	let password_file = dir.as_ref().join("admin.pass");
-	common::str_to_ro_file(&password, password_file)?;
-	let password = auth::generate_argon2_phc(&password)?;
-
-	const TOKEN_LEN: usize = 34;
-	let token = auth::generate_secret(TOKEN_LEN)?;
-	let token = token.as_bytes();
-	let token = auth::BASE32_NOPAD.encode(token);
-	info!("Site admin TOTP token generated");
-	let token_file = dir.as_ref().join("admin.totp");
-	common::str_to_ro_file(&token, token_file)?;
-	
-	let creds = Credentials { user, password, token };
-
-	Ok(creds)
-    }
-}
-
-/// TODO Document
-#[derive(Debug, Deserialize, Serialize, PartialEq)]
 pub(crate) struct DocPaths {
     pub templates: String,
     pub webroot: String,
@@ -213,7 +180,6 @@ impl DocPaths {
 #[derive(Debug, Deserialize, Serialize, PartialEq)]
 pub(crate) struct AppConfig {
     pub site: Site,
-    pub creds: Credentials,
     pub server: Server,
     pub docpaths: DocPaths,
 }
@@ -236,11 +202,9 @@ impl AppConfig {
 	let docpaths = DocPaths::new(&dir);
 	let site = Site::new_from_input(reader)?;
 	let server = Server::new();
-	let creds = Credentials::new_from_input(&dir, reader)?;
 	
 	let config = AppConfig {
 	    site,
-	    creds,
 	    server,
 	    docpaths,
 	};
@@ -294,14 +258,12 @@ mod tests {
     fn build_config_from_input() {
 	let dir = tempfile::tempdir().unwrap();
 	// Setup all target fields
-	let mut src: &[u8] = b"Site Name\nAuthor Name\nOne, Two, Three, And More\nadmin\n";
+	let mut src: &[u8] = b"Site Name\nAuthor Name\nOne, Two, Three, And More\n";
 	let config = AppConfig::generate(&dir, &mut src);
 	assert!(config.is_ok());
 
 	let tmp_dir = &dir.path();
 	let config_path = &tmp_dir.join("config.toml");
-	let admin = &tmp_dir.join("admin.pass");
-	let token = &tmp_dir.join("admin.totp");
 	let site = &tmp_dir.join("site");
 	let templates = &tmp_dir.join("site/templates");
 	let webroot = &tmp_dir.join("site/webroot");
@@ -316,7 +278,7 @@ mod tests {
 	let three_posts = &tmp_dir.join("site/webroot/three/posts");
 	let and_more_ext = &tmp_dir.join("site/webroot/and-more/ext");
 	let and_more_posts = &tmp_dir.join("site/webroot/and-more/posts");
-	let core = vec![config_path, admin, token, site, templates,
+	let core = vec![config_path, site, templates,
 			webroot, static_ext, main_ext, main_posts,
 			one_ext, one_posts, two_ext, two_posts,
 			three_ext, three_posts, and_more_ext, and_more_posts];

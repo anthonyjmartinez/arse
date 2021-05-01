@@ -16,7 +16,6 @@ use log::{info, error};
 use hyper::Server;
 use routerify::RouterService;
 
-mod auth;
 mod config;
 mod common;
 mod render;
