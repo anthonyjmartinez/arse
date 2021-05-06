@@ -207,4 +207,17 @@ Super Wow!
 	assert!(page.contains("super useful"));
 	assert!(page.contains("Super Wow!"));
     }
+    
+    #[test]
+    fn check_render_empty_topic() {
+	let dir = tempfile::tempdir().unwrap();
+	let mut src: &[u8] = b"Site Name\nAuthor Name\nOne, Two, Three, And More\nadmin\n";
+	let config = AppConfig::generate(&dir, &mut src).unwrap();
+	let config = Arc::new(config);
+	let engine = Engine::new(config);
+
+	let page = engine.render_topic("one").unwrap();
+
+	assert!(page.contains("Coming Soon"));
+    }
 }

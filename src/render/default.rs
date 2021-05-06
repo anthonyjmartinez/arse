@@ -32,14 +32,12 @@ pub(crate) const TEMPLATE: &str = r#"
 <main>
 {% if post %}
 {{ post }}
-{% elif posts %}
-{% if posts | length == 0 %}
+{% elif posts | length < 1 %}
 <h3>Coming Soon!</h3>
 {% else %}
 {%- for post in posts %}
 {{ post }}
 {%- endfor -%}
-{% endif %}
 {% endif %}
 </main>
 <footer>
