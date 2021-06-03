@@ -26,11 +26,12 @@ pub(crate) fn router(engine: Arc<Engine>) -> Router<Body, Error> {
     debug!("Building site router");
     Router::builder()
         .data(engine)
-        .get("/", index_handler)
+        .get("/static/:fname", static_assets)
+        .get("/favicon.ico", favicon)
         .get("/:topic", topic_handler)
         .get("/:topic/ext/:fname", topic_assets)
         .get("/:topic/posts/:post", post_handler)
-        .get("/static/:fname", static_assets)
+        .get("/", index_handler)
         .err_handler(error_handler)
         .build()
         .unwrap()
@@ -77,6 +78,18 @@ async fn static_assets(req: Request<Body>) -> Result<Response<Body>> {
     let static_path = Path::new(&engine.app.docpaths.webroot).join("static").join(resource);
     let mut f = File::open(&static_path)
         .with_context(|| format!("failed to open '{}'", &static_path.display()))?;
+    let mut buf = Vec::new();
+    f.read_to_end(&mut buf).context("failed to read to buffer")?;
+    Ok(Response::new(Body::from(buf)))
+}
+
+/// Handler for "/favicon.ico"
+async fn favicon(req: Request<Body>) -> Result<Response<Body>> { 
+    let engine = req.data::<Arc<Engine>>().unwrap();
+    info!("Handling favicon request");
+    let favicon_path = Path::new(&engine.app.docpaths.webroot).join("static").join("favicon.ico");
+    let mut f = File::open(&favicon_path)
+        .with_context(|| format!("failed to open '{}'", &favicon_path.display()))?;
     let mut buf = Vec::new();
     f.read_to_end(&mut buf).context("failed to read to buffer")?;
     Ok(Response::new(Body::from(buf)))
@@ -154,6 +167,11 @@ One Important Test
 	let mut f = File::create(&dir.path().join("site/webroot/static/main-static")).unwrap();
 	f.write_all(static_asset).unwrap();
 
+	let favicon = b"Favicon File\n";
+
+	let mut f = File::create(&dir.path().join("site/webroot/static/favicon.ico")).unwrap();
+	f.write_all(favicon).unwrap();
+
 	let router = router(engine.clone());
 
 	let index_request = Request::builder()
@@ -186,6 +204,12 @@ One Important Test
 	    .body(Body::default())
 	    .unwrap();
 
+	let favicon_request = Request::builder()
+	    .method("GET")
+	    .uri("http://localhost:9090/favicon.ico")
+	    .body(Body::default())
+	    .unwrap();
+
 	let service = RouterService::new(router).unwrap();
 	let addr = format!("{}:{}", engine.app.server.bind, engine.app.server.port);
 	let addr: SocketAddr = addr.parse().unwrap();
@@ -205,7 +229,6 @@ One Important Test
 	    }
 	});
 
-
 	let client = Client::new();
 
 	let index_resp = client.request(index_request).await.unwrap();
@@ -213,11 +236,13 @@ One Important Test
 	let topic_resp = client.request(topic_request).await.unwrap();
 	let topic_asset_resp = client.request(topic_asset_request).await.unwrap();
 	let static_asset_resp = client.request(static_asset_request).await.unwrap();
+	let favicon_resp = client.request(favicon_request).await.unwrap();
 	assert_eq!(index_resp.status(), StatusCode::OK);
 	assert_eq!(post_resp.status(), StatusCode::OK);
 	assert_eq!(topic_resp.status(), StatusCode::OK);
 	assert_eq!(topic_asset_resp.status(), StatusCode::OK);
 	assert_eq!(static_asset_resp.status(), StatusCode::OK);
+	assert_eq!(favicon_resp.status(), StatusCode::OK);
 
 	let _ = tx.send(());
     }

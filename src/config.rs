@@ -220,7 +220,7 @@ impl AppConfig {
     fn create_paths(&self) -> Result<()> {
 	info!("Creating site filesystem tree");
 	create_dir_all(&self.docpaths.templates)?;
-	create_dir_all(format!("{}/static/ext", &self.docpaths.webroot))?;
+	create_dir_all(format!("{}/static", &self.docpaths.webroot))?;
 	create_dir_all(format!("{}/main/ext", &self.docpaths.webroot))?;
 	create_dir_all(format!("{}/main/posts", &self.docpaths.webroot))?;
 
@@ -267,7 +267,7 @@ mod tests {
 	let site = &tmp_dir.join("site");
 	let templates = &tmp_dir.join("site/templates");
 	let webroot = &tmp_dir.join("site/webroot");
-	let static_ext = &tmp_dir.join("site/webroot/static/ext");
+	let static_data = &tmp_dir.join("site/webroot/static");
 	let main_ext = &tmp_dir.join("site/webroot/main/ext");
 	let main_posts = &tmp_dir.join("site/webroot/main/posts");
 	let one_ext = &tmp_dir.join("site/webroot/one/ext");
@@ -279,7 +279,7 @@ mod tests {
 	let and_more_ext = &tmp_dir.join("site/webroot/and-more/ext");
 	let and_more_posts = &tmp_dir.join("site/webroot/and-more/posts");
 	let core = vec![config_path, site, templates,
-			webroot, static_ext, main_ext, main_posts,
+			webroot, static_data, main_ext, main_posts,
 			one_ext, one_posts, two_ext, two_posts,
 			three_ext, three_posts, and_more_ext, and_more_posts];
 	for p in core {
