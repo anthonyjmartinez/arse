@@ -8,6 +8,14 @@ http://opensource.org/licenses/MIT>, at your option. This file may not be
 copied, modified, or distributed except according to those terms.
 */
 
+//! Provides features for configuration of A Rust Site Engine.
+//!
+//! This includes:
+//! - Argument processing
+//! - Setting up logging
+//! - Loading application configuration from disk (when `arse run /path/to/config` is called)
+//! - Generating a new application configuration and directory structure (when `arse new` is called)
+
 use std::fs::create_dir_all;
 use std::{io::BufRead, usize};
 use std::path::Path;
@@ -20,6 +28,7 @@ use serde::{Serialize, Deserialize};
 use super::common;
 use super::{anyhow, Context, Result};
 
+/// Configures a [`clap::App`] for argument parsing.
 fn args() -> App<'static, 'static> {
     App::new("A Rust Site Engine")
 	.version(crate_version!())
@@ -42,8 +51,9 @@ fn args() -> App<'static, 'static> {
 		    )
 }
 
-/// TODO Document this public function
-/// And Include an Example of its Use
+/// Processes command-line arguments and configures logging.
+///
+/// Returns: [`Result<AppConfig>`] or exits after generating a new config, and writing it to disk.
 pub(crate) fn load() -> Result<AppConfig> {
     let config: Result<AppConfig>;
     let matches = args().get_matches();
@@ -53,7 +63,7 @@ pub(crate) fn load() -> Result<AppConfig> {
         .set_time_format_str("%+")
         .build();
 
-    // After this block locking is configured at the specified level
+    // After this block logging is configured at the specified level
     match matches.occurrences_of("verbosity") {
 	0 => SimpleLogger::init(log::LevelFilter::Info, log_config).context("failed to initialize logger at level - INFO")?,
 	1 => SimpleLogger::init(log::LevelFilter::Debug, log_config).context("failed to initialize logger at level - DEBUG")?,
@@ -117,7 +127,7 @@ fn csv_to_vec(csv: &str) -> Vec<String> {
     val_vec
 }
 
-/// TODO Document
+/// Contains the site's name, author, rendering template, and topics.
 #[derive(Debug, Deserialize, Serialize, PartialEq)]
 pub(crate) struct Site {
     pub name: String,
@@ -127,6 +137,7 @@ pub(crate) struct Site {
 }
 
 impl Site {
+    /// Creates a new [`Site`] from user input.
     pub(crate) fn new_from_input<R: BufRead>(reader: &mut R) -> Result<Site> {
 	let name = get_input("Please enter a name for the site: ", reader)?;
 	let author = get_input("Please enter the site author's name: ", reader)?;
@@ -140,7 +151,7 @@ impl Site {
     }
 }
 
-/// TODO Document
+/// Contains server configuration parameters: bind address, and port.
 #[derive(Debug, Deserialize, Serialize, PartialEq)]
 pub(crate) struct Server {
     pub bind: String,
@@ -148,6 +159,7 @@ pub(crate) struct Server {
 }
 
 impl Server {
+    /// Creates a new [`Server`] instance with defaults: `0.0.0.0:9090`.
     pub(crate) fn new() -> Server {
 	Server {
 	    bind: "0.0.0.0".to_owned(),
@@ -156,7 +168,7 @@ impl Server {
     }
 }
 
-/// TODO Document
+/// Contains the paths for template and site content
 #[derive(Debug, Deserialize, Serialize, PartialEq)]
 pub(crate) struct DocPaths {
     pub templates: String,
@@ -164,6 +176,9 @@ pub(crate) struct DocPaths {
 }
 
 impl DocPaths {
+    /// Creates a new [`DocPaths`] instance, by default from the current working directory's absolute path.
+    ///
+    /// Relative paths are supported, and can be changed in the resulting `config.toml`
     pub(crate) fn new<P: AsRef<Path>>(dir: P) -> DocPaths {
 	debug!("Creating site DocPaths");
 	let dir = dir.as_ref().display();
@@ -176,7 +191,7 @@ impl DocPaths {
     }
 }
 
-/// TODO Document
+/// Provides the overall application configuration used by the server and rendering engine.
 #[derive(Debug, Deserialize, Serialize, PartialEq)]
 pub(crate) struct AppConfig {
     pub site: Site,
@@ -185,6 +200,7 @@ pub(crate) struct AppConfig {
 }
 
 impl AppConfig {
+    /// Loads an existing [`AppConfig`] from disk.
     pub(crate) fn from_path<T: AsRef<Path>>(config: T) -> Result<AppConfig> {
 	debug!("Loading site configuration from {}", &config.as_ref().display());
 	let config_string = std::fs::read_to_string(&config)
@@ -197,6 +213,7 @@ impl AppConfig {
 	Ok(app_config)
     }
 
+    /// Generates a new [`AppConfig`] from user input, and creates necessary [`DocPaths`] paths on disk.
     pub(crate) fn generate<P: AsRef<Path>, R: BufRead>(dir: P, reader: &mut R) -> Result<AppConfig> {
 	info!("Generating new site configuration");
 	let docpaths = DocPaths::new(&dir);
@@ -233,6 +250,7 @@ impl AppConfig {
 	Ok(())
     }
 
+    /// Writes an [`AppConfig`] to disk in the current working directory as `config.toml`.
     fn write<P: AsRef<Path>>(&self, dir: P) -> Result<()> {
 	info!("Writing site configuration to disk");
 	let config = toml::to_string_pretty(&self).context("failure creating TOML")?;
