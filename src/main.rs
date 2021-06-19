@@ -8,6 +8,14 @@ http://opensource.org/licenses/MIT>, at your option. This file may not be
 copied, modified, or distributed except according to those terms.
 */
 
+//! Main entry point for A Rust Site Engine.
+//!
+//! # Options
+//! - `run [config]`: Starts a server defined by the `[config]` TOML.
+//! - `new`: Creates a new `[config]` TOML from user input, and creates
+//!          the site's directory structure.
+
+
 use std::net::SocketAddr;
 use std::sync::Arc;
 

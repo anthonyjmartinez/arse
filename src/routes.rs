@@ -8,7 +8,8 @@ http://opensource.org/licenses/MIT>, at your option. This file may not be
 copied, modified, or distributed except according to those terms.
 */
 
-//use std::convert::Infallible;
+//! Provides an HTTP route handler using [`Engine`] to serve content with [`routerify`].
+
 use std::fs::File;
 use std::io::prelude::*;
 use std::path::Path;
@@ -22,6 +23,7 @@ use super::render::Engine;
 use super::{Context, Error, Result};
 
 
+/// Creates a [`Router<Body, Error>`] instance with a given [`Arc<Engine>`].
 pub(crate) fn router(engine: Arc<Engine>) -> Router<Body, Error> {
     debug!("Building site router");
     Router::builder()
@@ -37,14 +39,13 @@ pub(crate) fn router(engine: Arc<Engine>) -> Router<Body, Error> {
         .unwrap()
 }
 
-/// Error handler
+/// Handles errors from either bad requests or server errors
 pub(crate) async fn error_handler(err: RouteError) -> Response<Body> {
-    // TODO: use the correct status codes given specific context
     error!("{}", err);
 
     Response::builder()
-        .status(StatusCode::INTERNAL_SERVER_ERROR)
-        .body(Body::from("Internal Error"))
+        .status(StatusCode::NOT_FOUND)
+        .body(Body::from("Not Found"))
         .unwrap()
 }
 
@@ -210,6 +211,24 @@ One Important Test
 	    .body(Body::default())
 	    .unwrap();
 
+	let bad_topic_request = Request::builder()
+	    .method("GET")
+	    .uri("http://localhost:9090/badtopic")
+	    .body(Body::default())
+	    .unwrap();
+
+	let bad_post_request = Request::builder()
+	    .method("GET")
+	    .uri("http://localhost:9090/one/posts/nope")
+	    .body(Body::default())
+	    .unwrap();
+
+	let bad_static_request = Request::builder()
+	    .method("GET")
+	    .uri("http://localhost:9090/static/nope")
+	    .body(Body::default())
+	    .unwrap();
+
 	let service = RouterService::new(router).unwrap();
 	let addr = format!("{}:{}", engine.app.server.bind, engine.app.server.port);
 	let addr: SocketAddr = addr.parse().unwrap();
@@ -243,6 +262,13 @@ One Important Test
 	assert_eq!(topic_asset_resp.status(), StatusCode::OK);
 	assert_eq!(static_asset_resp.status(), StatusCode::OK);
 	assert_eq!(favicon_resp.status(), StatusCode::OK);
+
+	let bad_topic_resp = client.request(bad_topic_request).await.unwrap();
+	let bad_post_resp = client.request(bad_post_request).await.unwrap();
+	let bad_static_resp = client.request(bad_static_request).await.unwrap();
+	assert_eq!(bad_topic_resp.status(), StatusCode::NOT_FOUND);
+	assert_eq!(bad_post_resp.status(), StatusCode::NOT_FOUND);
+	assert_eq!(bad_static_resp.status(), StatusCode::NOT_FOUND);
 
 	let _ = tx.send(());
     }
@@ -303,4 +329,5 @@ One Important Test
 
 	let _ = tx.send(());
     }
+
 }

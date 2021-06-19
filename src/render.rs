@@ -8,6 +8,8 @@ http://opensource.org/licenses/MIT>, at your option. This file may not be
 copied, modified, or distributed except according to those terms.
 */
 
+//! Provides the rendering engine for topics and posts using [`AppConfig`], [`Tera`], and [`pulldown_cmark`].
+
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -20,8 +22,14 @@ use pulldown_cmark::{Parser, html};
 use tera::Tera;
 use tera::Context as TemplateContext;
 
+/// Static defaults for the rendering engine.
 mod default;
 
+
+/// Rendering engine for topics and posts.
+///
+/// [`Engine`] stores an [`Arc<AppConfig>`] and a [`Tera`] instance from which
+/// all rendering and serving tasks are executed.
 #[derive(Debug)]
 pub(crate) struct Engine {
     pub app: Arc<AppConfig>,
@@ -29,6 +37,7 @@ pub(crate) struct Engine {
 }
 
 impl Engine {
+    /// Creates a new [`Engine`] from a given [`AppConfig`].
     pub(crate) fn new(app: Arc<AppConfig>) -> Engine {
 	trace!("Loading rendering engine");
 	let instance = Self::load_template(app.clone()).unwrap();
@@ -57,6 +66,7 @@ impl Engine {
 	Ok(tera)
     }
 
+    /// Renders `/:topic` content as HTML
     pub(crate) fn render_topic(&self, topic_slug: &str) -> Result<String> {
 	debug!("Rendering topic: '{}'", topic_slug);
 	let site = &self.app.site;
@@ -95,6 +105,7 @@ impl Engine {
 	Ok(contents)
     }
 
+    /// Renders `/:topic/posts/:post` content as HTML
     pub(crate) fn render_post(&self, topic_slug: &str, post: &str) -> Result<String> {
 	debug!("Rendering post: '{}'", post);
 	let site = &self.app.site;

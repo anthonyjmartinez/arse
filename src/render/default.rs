@@ -8,6 +8,7 @@ http://opensource.org/licenses/MIT>, at your option. This file may not be
 copied, modified, or distributed except according to those terms.
 */
 
+/// Default [`tera`] template for A Rust Site Engine's rendering engine
 pub(crate) const TEMPLATE: &str = r#"
 <!DOCTYPE html>
 <html lang="en">

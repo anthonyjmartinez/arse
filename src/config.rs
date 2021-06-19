@@ -28,7 +28,6 @@ use serde::{Serialize, Deserialize};
 use super::common;
 use super::{anyhow, Context, Result};
 
-/// Configures a [`clap::App`] for argument parsing.
 fn args() -> App<'static, 'static> {
     App::new("A Rust Site Engine")
 	.version(crate_version!())

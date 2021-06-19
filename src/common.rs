@@ -13,6 +13,7 @@ copied, modified, or distributed except according to those terms.
 use std::io::prelude::*;
 use std::path::{Path, PathBuf};
 
+use anyhow::anyhow;
 use glob::glob;
 use log::{debug, trace};
 
@@ -72,21 +73,29 @@ pub(crate) fn str_to_ro_file<P: AsRef<Path>>(content: &str, dest: P) -> Result<(
 ///
 /// The returned items are reverse-lexically sorted.
 pub fn path_matches(pat: &str) -> Result<Vec<PathBuf>> {
-    debug!("Building topic content vector from {}", &pat);
-    let mut path_vec: Vec<PathBuf> = Vec::new();
+    trace!("Verifying parent exists for pattern: {}", &pat);
+    let mut path = PathBuf::from(&pat);
+    path.pop();
 
-    trace!("Globbing {}", &pat);
-    let entries = glob(pat)
-        .context("failure globbing paths")?;
+    if path.exists() {
+	debug!("Building topic content vector from {}", &pat);
+	let mut path_vec: Vec<PathBuf> = Vec::new();
 
-    for entry in entries.filter_map(Result::ok) {
-	trace!("Adding '{}' to topic content vector", &entry.display());
-	path_vec.push(entry);
-    }
+	trace!("Globbing {}", &pat);
+	let entries = glob(pat)
+	    .context("failure globbing paths")?;
+
+	for entry in entries.filter_map(Result::ok) {
+	    trace!("Adding '{}' to topic content vector", &entry.display());
+	    path_vec.push(entry);
+	}
     
-    trace!("Reversing topic content vector for LIFO site rendering");
-    path_vec.reverse();
-    Ok(path_vec)
+	trace!("Reversing topic content vector for LIFO site rendering");
+	path_vec.reverse();
+	Ok(path_vec)
+    } else {
+	Err(anyhow!("No valid parent path for '{}'", &pat))
+    }
 }
 
 /// Returns the slugified topic as a `String`
@@ -95,3 +104,15 @@ pub fn slugify(topic: &str) -> String {
     topic.to_ascii_lowercase().replace(char::is_whitespace, "-")
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn invalid_parent_path() {
+	let dir = tempfile::tempdir().unwrap();
+	let pat = format!("{}/nope/*.md", dir.path().display());
+	let paths = path_matches(&pat);
+	assert!(paths.is_err());
+    }
+}
