@@ -68,12 +68,21 @@ impl Engine {
 
     /// Renders `/:topic` content as HTML
     pub(crate) fn render_topic(&self, topic_slug: &str) -> Result<String> {
-	debug!("Rendering topic: '{}'", topic_slug);
 	let site = &self.app.site;
-	let topic_data = self.load_topic(topic_slug)?;
 	let mut context = TemplateContext::new();
 	context.insert("site", site);
-	context.insert("posts", &topic_data);
+
+	if topic_slug == "gallery" {
+	    debug!("Rendering image gallery");
+	    // TODO: Sort out what data type this ought to be and how it can best be rendered
+	    let gallery = self.load_gallery()?;
+	    context.insert("gallery", &gallery);
+	} else {
+	    debug!("Rendering topic: '{}'", topic_slug);
+	    let topic_data = self.load_topic(topic_slug)?;
+	    context.insert("posts", &topic_data);
+	}
+
 	let output = self.instance.render(&site.template, &context)
 	    .with_context(|| format!("failed rendering topic: {}, with Tera instance: {:?}", topic_slug, self.instance))?;
 
@@ -105,6 +114,12 @@ impl Engine {
 	Ok(contents)
     }
 
+    fn load_gallery(&self) -> Result<()>{
+	// Do we use this to generate the JS for the gallery directly
+	// Or just to load the files out of gallery/ext/???
+	Ok(())
+    }
+    
     /// Renders `/:topic/posts/:post` content as HTML
     pub(crate) fn render_post(&self, topic_slug: &str, post: &str) -> Result<String> {
 	debug!("Rendering post: '{}'", post);

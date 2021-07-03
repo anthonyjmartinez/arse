@@ -32,6 +32,8 @@ pub(crate) const TEMPLATE: &str = r#"
 </header>
 <main>
 {% if post %}
+<!-- ALSO CHECK FOR gallery and if it exists insert the JS here -->
+<!-- USE THIS IN GALLERY MODE TO CONTAIN THE DIV ELEMENT NEEDED TO DISPLAY THE GALLERY -->
 {{ post }}
 {% elif posts | length < 1 %}
 <h3>Coming Soon!</h3>

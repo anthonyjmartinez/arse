@@ -76,7 +76,7 @@ The following elements are available within the Tera context for rendering:
 * Items in `[docpaths]` are generated as full paths for completeness, however relative paths will work if desired
   * From the example above the user is free to simply use `site/templates` and `site/webroot` and move the directory out of `/home/user`
   * Note that `arse new` creates the site tree, and all other output files, in the current working directory.
-
+  * If `gallery` is one of the topics requested it will # PLACEHOLDER FOR TEMPLATE INFO
 ## Path to 1.0
 
 - [x] Dynamic route handling
@@ -85,6 +85,7 @@ The following elements are available within the Tera context for rendering:
 - [x] Support custom Tera templates
 - [x] Support custom bind address and port
 - [x] Support favicons
+- [x] Support a special `gallery` topic
 - [ ] Support RSS feeds
 
 ### License
