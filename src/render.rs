@@ -124,6 +124,7 @@ impl Engine {
 	    *path = path.strip_prefix(&self.app.docpaths.webroot)?.to_path_buf();
 	}
 
+	trace!("Gallery items: {:?}", paths);
 	Ok(paths)
     }
     
@@ -273,5 +274,18 @@ Super Wow!
 	let page = engine.render_topic("gallery").unwrap();
 
 	assert!(page.contains("<script>"));
+    }
+
+    #[test]
+    fn check_render_empty_gallery() {
+	let dir = tempfile::tempdir().unwrap();
+	let mut src: &[u8] = b"Site Name\nAuthor Name\nOne, Gallery\nadmin\n";
+	let config = AppConfig::generate(&dir, &mut src).unwrap();
+	let config = Arc::new(config);
+	let engine = Engine::new(config);
+
+	let page = engine.render_topic("gallery").unwrap();
+
+	assert!(page.contains("Coming Soon"));
     }
 }

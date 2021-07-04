@@ -63,12 +63,12 @@ function change_img(dir) {
 </center>
 {% elif post %}
 {{ post }}
-{% elif posts | length < 1 %}
-<h3>Coming Soon!</h3>
-{% else %}
+{% elif posts %}
 {%- for post in posts %}
 {{ post }}
 {%- endfor -%}
+{% else %}
+<h3>Coming Soon!</h3>
 {% endif %}
 </main>
 <footer>
