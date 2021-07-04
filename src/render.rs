@@ -74,7 +74,6 @@ impl Engine {
 
 	if topic_slug == "gallery" {
 	    debug!("Rendering image gallery");
-	    // TODO: Sort out what data type this ought to be and how it can best be rendered
 	    let gallery = self.load_gallery()?;
 	    context.insert("gallery", &gallery);
 	} else {
@@ -114,10 +113,18 @@ impl Engine {
 	Ok(contents)
     }
 
-    fn load_gallery(&self) -> Result<()>{
-	// Do we use this to generate the JS for the gallery directly
-	// Or just to load the files out of gallery/ext/???
-	Ok(())
+    fn load_gallery(&self) -> Result<Vec<PathBuf>> {
+	debug!("Loading gallery content");
+	let gallery_path = Path::new(&self.app.docpaths.webroot).join("gallery").join("ext");
+	let pat = format!("{}/*.jpg", gallery_path.display());
+	let mut paths = common::path_matches(&pat)?;
+	
+	trace!("Stripping path prefixes");
+	for path in paths.iter_mut() {
+	    *path = path.strip_prefix(&self.app.docpaths.webroot)?.to_path_buf();
+	}
+
+	Ok(paths)
     }
     
     /// Renders `/:topic/posts/:post` content as HTML
@@ -245,5 +252,26 @@ Super Wow!
 	let page = engine.render_topic("one").unwrap();
 
 	assert!(page.contains("Coming Soon"));
+    }
+    
+    #[test]
+    fn check_render_gallery_topic() {
+	let dir = tempfile::tempdir().unwrap();
+	let mut src: &[u8] = b"Site Name\nAuthor Name\nOne, Gallery\nadmin\n";
+	let config = AppConfig::generate(&dir, &mut src).unwrap();
+	let config = Arc::new(config);
+	let engine = Engine::new(config);
+
+	let fake_img = "some bytes";
+	let fake_img_2 = "some more bytes";
+	
+	let mut f = File::create(&dir.path().join("site/webroot/gallery/ext/0.jpg")).unwrap();
+	f.write_all(&fake_img.as_bytes()).unwrap();
+
+	let mut f = File::create(&dir.path().join("site/webroot/gallery/ext/1.jpg")).unwrap();
+	f.write_all(&fake_img_2.as_bytes()).unwrap();
+	let page = engine.render_topic("gallery").unwrap();
+
+	assert!(page.contains("<script>"));
     }
 }

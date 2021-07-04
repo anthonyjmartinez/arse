@@ -299,6 +299,12 @@ One Important Test
 	    .body(Body::default())
 	    .unwrap();
 
+	let gallery_request = Request::builder()
+	    .method("GET")
+	    .uri("http://localhost:8901/gallery")
+	    .body(Body::default())
+	    .unwrap();
+
 	let service = RouterService::new(router).unwrap();
 	let addr = format!("{}:{}", engine.app.server.bind, engine.app.server.port);
 	let addr: SocketAddr = addr.parse().unwrap();
@@ -323,10 +329,11 @@ One Important Test
 	let index_resp = client.request(index_request).await.unwrap();
 	let post_resp = client.request(post_request).await.unwrap();
 	let topic_resp = client.request(topic_request).await.unwrap();
+	let gallery_resp = client.request(gallery_request).await.unwrap();
 	assert_eq!(index_resp.status(), StatusCode::OK);
 	assert_eq!(post_resp.status(), StatusCode::OK);
 	assert_eq!(topic_resp.status(), StatusCode::OK);
-
+	assert_eq!(gallery_resp.status(), StatusCode::OK);
 	let _ = tx.send(());
     }
 

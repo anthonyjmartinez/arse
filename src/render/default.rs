@@ -31,9 +31,37 @@ pub(crate) const TEMPLATE: &str = r#"
 </center>
 </header>
 <main>
-{% if post %}
-<!-- ALSO CHECK FOR gallery and if it exists insert the JS here -->
-<!-- USE THIS IN GALLERY MODE TO CONTAIN THE DIV ELEMENT NEEDED TO DISPLAY THE GALLERY -->
+{% if gallery %}
+<script>
+var images = new Array();
+{%- for img in gallery %}
+images[{{ loop.index0 }}] = "{{ img }}";
+{%- endfor -%}
+var imgCt = 0;
+function change_img(dir) {
+        if (dir == "next" && imgCt < images.length - 1) {
+                imgCt++;
+        }
+
+        if (dir == "prev" && imgCt > 0) {
+                imgCt--;
+        } 
+
+        var doc = document.getElementById("gallery");
+        var img = new Image();
+        img.src = images[imgCt];
+
+        doc.replaceChildren(img);
+}
+</script>
+<center>
+<div id="gallery">
+<img src="{{ gallery | first }}"/>
+</div>
+<button type="button" onclick="change_img('prev'); return false">❮</button>
+<button type="button" onclick="change_img('next'); return false">❯</button>
+</center>
+{% elif post %}
 {{ post }}
 {% elif posts | length < 1 %}
 <h3>Coming Soon!</h3>

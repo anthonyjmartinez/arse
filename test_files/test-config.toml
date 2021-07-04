@@ -2,7 +2,7 @@
 name = "My Awesome Blog!"
 author = "Neo"
 template = "special.tmpl"
-topics = ["one", "two", "three"]
+topics = ["one", "two", "three", "gallery"]
 
 [server]
 bind = "0.0.0.0"
