@@ -87,7 +87,7 @@ The following elements are available within the Tera context for rendering:
 - [x] Support custom bind address and port
 - [x] Support favicons
 - [x] Support a special `gallery` topic
-- [ ] Support RSS feeds
+- [x] Support RSS feeds
 
 ### License
 

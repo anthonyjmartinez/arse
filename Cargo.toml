@@ -1,6 +1,6 @@
 [package]
 name = "arse"
-version = "0.10.1"
+version = "0.11.0"
 authors = ["Anthony Martinez"]
 edition = "2018"
 license = "MIT OR Apache-2.0"
@@ -22,6 +22,7 @@ log = "0.4"
 pulldown-cmark = { version = "0.8", default-features = false, features = ["simd"] }
 rand = "0.8"
 routerify = "2"
+rss = "1"
 serde = { version = "1", features = ["derive"] }
 simplelog = "0.10.0"
 tera = "1"

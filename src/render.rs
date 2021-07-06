@@ -19,8 +19,8 @@ use super::{Context, Result};
 
 use log::{debug, trace};
 use pulldown_cmark::{Parser, html};
-use tera::Tera;
-use tera::Context as TemplateContext;
+use rss::{Channel, ChannelBuilder, Item, ItemBuilder};
+use tera::{Tera, Context as TemplateContext};
 
 /// Static defaults for the rendering engine.
 mod default;
@@ -162,7 +162,41 @@ impl Engine {
 
 	Ok(html_output)
     }
+
+    /// Generates an RSS feed of 
+    pub(crate) fn rss(&self) -> Result<String> {
+	debug!("Rendering RSS Feed");
+	let site = &self.app.site;
+	let items = Self::rss_items(&self)?;
+	let channel = ChannelBuilder::default()
+	    .title(&site.name)
+	    .link("stuff") // TODO: add an item to config::Site to hold the domain name
+	    .description(format!("{} RSS Feed", &site.name))
+	    .items(items)
+	    .build()
+	    .unwrap();
+
+	Ok(channel.to_string())
+    }
+
+    fn rss_items(&self) -> Result<Vec<Item>> {
+	// TODO: Actually implement this in a meangingful way
+	/*
+	Need to loop across the topics and their contents and build Item
+	entities to push into a vector. Probably need to also get post
+	modification times.
+	
+	Need to come up with some way to define the title/description.
+	*/
+	let item1 = Item::default();
+
+	let item2 = Item::default();
+
+	let items = vec![item1, item2];
+	Ok(items)
+    }
 }
+
 #[cfg(test)]
 mod tests {
     use super::*;

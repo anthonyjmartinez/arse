@@ -30,6 +30,7 @@ pub(crate) fn router(engine: Arc<Engine>) -> Router<Body, Error> {
         .data(engine)
         .get("/static/:fname", static_assets)
         .get("/favicon.ico", favicon)
+        .get("/rss", rss_handler)
         .get("/:topic", topic_handler)
         .get("/:topic/ext/:fname", topic_assets)
         .get("/:topic/posts/:post", post_handler)
@@ -54,6 +55,15 @@ async fn index_handler(req: Request<Body>) -> Result<Response<Body>> {
     info!("Handling request to '/'");
     let engine = req.data::<Arc<Engine>>().unwrap();
     topic_posts(engine.clone(), "main".to_owned()).await
+}
+
+/// Handler for "/rss"
+async fn rss_handler(req: Request<Body>) -> Result<Response<Body>> {
+    let engine = req.data::<Arc<Engine>>().unwrap();
+    info!("Handling request to '/rss'");
+    // TODO: call a rss function on Engine
+
+    Ok(Response::new(Body::from("TEMPORARY")))
 }
 
 /// Handler for "/:topic"
