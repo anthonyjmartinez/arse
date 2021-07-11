@@ -131,6 +131,7 @@ fn csv_to_vec(csv: &str) -> Vec<String> {
 pub(crate) struct Site {
     pub name: String,
     pub author: String,
+    pub url: String,
     pub template: String,
     pub topics: Vec<String>,
 }
@@ -140,10 +141,11 @@ impl Site {
     pub(crate) fn new_from_input<R: BufRead>(reader: &mut R) -> Result<Site> {
 	let name = get_input("Please enter a name for the site: ", reader)?;
 	let author = get_input("Please enter the site author's name: ", reader)?;
+	let url = get_input("Please enter the base URL for your site: ", reader)?;
 	let topics = get_input("Please enter comma-separated site topics: ", reader)?;
 	let topics = csv_to_vec(&topics);
 	let template = "default.tmpl".to_owned();
-	let site = Site { name, author, template, topics };
+	let site = Site { name, author, url, template, topics };
 
 	trace!("Site: {:?}", site);
 	Ok(site)
@@ -275,7 +277,7 @@ mod tests {
     fn build_config_from_input() {
 	let dir = tempfile::tempdir().unwrap();
 	// Setup all target fields
-	let mut src: &[u8] = b"Site Name\nAuthor Name\nOne, Two, Three, And More\n";
+	let mut src: &[u8] = b"Site Name\nAuthor Name\nhttps://my.example.site\nOne, Two, Three, And More\n";
 	let config = AppConfig::generate(&dir, &mut src);
 	assert!(config.is_ok());
 

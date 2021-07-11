@@ -10,6 +10,7 @@ copied, modified, or distributed except according to those terms.
 
 //! Provides the rendering engine for topics and posts using [`AppConfig`], [`Tera`], and [`pulldown_cmark`].
 
+use std::fs::File;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -17,9 +18,10 @@ use super::config::AppConfig;
 use super::common;
 use super::{Context, Result};
 
+use chrono::{DateTime, Utc};
 use log::{debug, trace};
 use pulldown_cmark::{Parser, html};
-use rss::{Channel, ChannelBuilder, Item, ItemBuilder};
+use rss::{Channel, Item};
 use tera::{Tera, Context as TemplateContext};
 
 /// Static defaults for the rendering engine.
@@ -150,7 +152,6 @@ impl Engine {
 	Self::read_post_to_html(post_path)
     }
 
-
     fn read_post_to_html<P: AsRef<Path>>(path: P) -> Result<String> {
 	debug!("Rendering Post Markdown to HTML");
 	trace!("Rendering {} to HTML", &path.as_ref().display());
@@ -163,36 +164,59 @@ impl Engine {
 	Ok(html_output)
     }
 
-    /// Generates an RSS feed of 
+    /// Renders `/rss.xml` for all topics
     pub(crate) fn rss(&self) -> Result<String> {
 	debug!("Rendering RSS Feed");
 	let site = &self.app.site;
 	let items = Self::rss_items(&self)?;
-	let channel = ChannelBuilder::default()
-	    .title(&site.name)
-	    .link("stuff") // TODO: add an item to config::Site to hold the domain name
-	    .description(format!("{} RSS Feed", &site.name))
-	    .items(items)
-	    .build()
-	    .unwrap();
+	let mut channel = Channel::default();
+	channel.set_title(&site.name);
+	channel.set_link(&site.url);
+	channel.set_description(format!("{} RSS Feed", &site.name));
+	channel.set_items(items);
 
 	Ok(channel.to_string())
     }
 
     fn rss_items(&self) -> Result<Vec<Item>> {
-	// TODO: Actually implement this in a meangingful way
-	/*
-	Need to loop across the topics and their contents and build Item
-	entities to push into a vector. Probably need to also get post
-	modification times.
-	
-	Need to come up with some way to define the title/description.
-	*/
-	let item1 = Item::default();
+	debug!("Building RSS Items");
+	let mut items: Vec<Item> = Vec::new();
+	items.append(&mut Self::topic_to_item(&self, "main")?);
 
-	let item2 = Item::default();
+	for topic in &self.app.site.topics {
+	    let mut topic_items = Self::topic_to_item(&self, &common::slugify(&topic))?;
+	    items.append(&mut topic_items);
+	}
 
-	let items = vec![item1, item2];
+	Ok(items)
+    }
+
+    fn topic_to_item(&self, topic_slug: &str) -> Result<Vec<Item>> {
+	trace!("Generating RSS Items for topic: {}", &topic_slug);
+	let mut items: Vec<Item> = Vec::new();
+	let topic_path = Path::new(&self.app.docpaths.webroot).join(topic_slug).join("posts");
+	let pat = format!("{}/*.md", topic_path.display());
+	let paths = common::path_matches(&pat)?;
+	for path in paths {
+	    trace!("Generating RSS Item for post at: {}", path.display());
+	    let link = format!("{}/{}/{}",
+			       &self.app.site.url,
+			       path.strip_prefix(&self.app.docpaths.webroot)?.parent().unwrap().to_str().unwrap(),
+			       path.file_stem().unwrap().to_str().unwrap());
+	    let f = File::open(&path)?;
+	    let updated = f.metadata()?.modified()?;
+	    let updated: DateTime<Utc> = updated.into();
+	    let updated = updated.to_rfc2822();
+	    
+	    let description = Self::read_post_to_html(path)?;
+
+	    let mut item = Item::default();
+	    item.set_link(link);
+	    item.set_pub_date(updated);
+	    item.set_description(description.to_owned());
+	    items.push(item);
+	}
+
 	Ok(items)
     }
 }
@@ -206,7 +230,7 @@ mod tests {
     #[test]
     fn check_default_template() {
 	let dir = tempfile::tempdir().unwrap();
-	let mut src: &[u8] = b"Site Name\nAuthor Name\nOne, Two, Three, And More\nadmin\n";
+	let mut src: &[u8] = b"Site Name\nAuthor Name\nhttps://special.example.site\nOne, Gallery\nadmin\n";
 	let config = AppConfig::generate(&dir, &mut src).unwrap();
 	let config = Arc::new(config);
 	let tera = Engine::load_template(config);
@@ -216,7 +240,7 @@ mod tests {
     #[test]
     fn check_render_post() {
 	let dir = tempfile::tempdir().unwrap();
-	let mut src: &[u8] = b"Site Name\nAuthor Name\nOne, Two, Three, And More\nadmin\n";
+	let mut src: &[u8] = b"Site Name\nAuthor Name\nhttps://special.example.site\nOne, Gallery\nadmin\n";
 	let config = AppConfig::generate(&dir, &mut src).unwrap();
 	let config = Arc::new(config);
 	let engine = Engine::new(config);
@@ -248,7 +272,7 @@ Super Wow!
     #[test]
     fn check_render_topic() {
 	let dir = tempfile::tempdir().unwrap();
-	let mut src: &[u8] = b"Site Name\nAuthor Name\nOne, Two, Three, And More\nadmin\n";
+	let mut src: &[u8] = b"Site Name\nAuthor Name\nhttps://special.example.site\nOne, Gallery\nadmin\n";
 	let config = AppConfig::generate(&dir, &mut src).unwrap();
 	let config = Arc::new(config);
 	let engine = Engine::new(config);
@@ -279,7 +303,7 @@ Super Wow!
     #[test]
     fn check_render_empty_topic() {
 	let dir = tempfile::tempdir().unwrap();
-	let mut src: &[u8] = b"Site Name\nAuthor Name\nOne, Two, Three, And More\nadmin\n";
+	let mut src: &[u8] = b"Site Name\nAuthor Name\nhttps://special.example.site\nOne, Gallery\nadmin\n";
 	let config = AppConfig::generate(&dir, &mut src).unwrap();
 	let config = Arc::new(config);
 	let engine = Engine::new(config);
@@ -292,7 +316,7 @@ Super Wow!
     #[test]
     fn check_render_gallery_topic() {
 	let dir = tempfile::tempdir().unwrap();
-	let mut src: &[u8] = b"Site Name\nAuthor Name\nOne, Gallery\nadmin\n";
+	let mut src: &[u8] = b"Site Name\nAuthor Name\nhttps://special.example.site\nOne, Gallery\nadmin\n";
 	let config = AppConfig::generate(&dir, &mut src).unwrap();
 	let config = Arc::new(config);
 	let engine = Engine::new(config);
@@ -313,7 +337,7 @@ Super Wow!
     #[test]
     fn check_render_empty_gallery() {
 	let dir = tempfile::tempdir().unwrap();
-	let mut src: &[u8] = b"Site Name\nAuthor Name\nOne, Gallery\nadmin\n";
+	let mut src: &[u8] = b"Site Name\nAuthor Name\nhttps://special.example.site\nOne, Gallery\nadmin\n";
 	let config = AppConfig::generate(&dir, &mut src).unwrap();
 	let config = Arc::new(config);
 	let engine = Engine::new(config);
@@ -321,5 +345,45 @@ Super Wow!
 	let page = engine.render_topic("gallery").unwrap();
 
 	assert!(page.contains("Coming Soon"));
+    }
+
+    #[test]
+    fn check_render_rss() {
+	let dir = tempfile::tempdir().unwrap();
+	let mut src: &[u8] = b"Site Name\nAuthor Name\nhttps://special.example.site\nOne, Gallery\nadmin\n";
+	let config = AppConfig::generate(&dir, &mut src).unwrap();
+	let config = Arc::new(config);
+	let engine = Engine::new(config);
+
+	let main_post = r#"
+### The Main Page
+
+This is just a main topic page.
+"#;
+	let one_post1 = r#"
+### A first post in One
+
+Super Wow!
+"#;
+	let one_post2 = r#"
+### [A second post in One](/one/posts/2)
+
+Super Wow TWICE!
+"#;
+	
+	let mut f = File::create(&dir.path().join("site/webroot/main/posts/index.md")).unwrap();
+	f.write_all(&main_post.as_bytes()).unwrap();
+
+	let mut f = File::create(&dir.path().join("site/webroot/one/posts/1.md")).unwrap();
+	f.write_all(&one_post1.as_bytes()).unwrap();
+
+	let mut f = File::create(&dir.path().join("site/webroot/one/posts/2.md")).unwrap();
+	f.write_all(&one_post2.as_bytes()).unwrap();
+
+	let rss = engine.rss().unwrap();
+
+	assert!(rss.contains("The Main Page"));
+	assert!(rss.contains("Super Wow!"));
+	assert!(rss.contains("A second post in One"));
     }
 }

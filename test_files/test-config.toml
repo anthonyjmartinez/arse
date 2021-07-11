@@ -1,6 +1,7 @@
 [site]
 name = "My Awesome Blog!"
 author = "Neo"
+url = "https://something.cool.here"
 template = "special.tmpl"
 topics = ["one", "two", "three", "gallery"]
 
