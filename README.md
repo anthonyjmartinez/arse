@@ -23,6 +23,8 @@ Please enter a name for the site:
 Example Site
 Please enter the site author's name: 
 Arthur Writeson
+Please enter the base URL for your site:
+https://www.example.com
 Please enter comma-separated site topics: 
 one, two, three
 2021-05-01T17:34:26.501980660+00:00 [INFO] Creating site filesystem tree
