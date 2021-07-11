@@ -30,6 +30,7 @@ pub(crate) fn router(engine: Arc<Engine>) -> Router<Body, Error> {
         .data(engine)
         .get("/static/:fname", static_assets)
         .get("/favicon.ico", favicon)
+        .get("/rss.xml", rss_handler)
         .get("/:topic", topic_handler)
         .get("/:topic/ext/:fname", topic_assets)
         .get("/:topic/posts/:post", post_handler)
@@ -54,6 +55,14 @@ async fn index_handler(req: Request<Body>) -> Result<Response<Body>> {
     info!("Handling request to '/'");
     let engine = req.data::<Arc<Engine>>().unwrap();
     topic_posts(engine.clone(), "main".to_owned()).await
+}
+
+/// Handler for "/rss"
+async fn rss_handler(req: Request<Body>) -> Result<Response<Body>> {
+    let engine = req.data::<Arc<Engine>>().unwrap();
+    info!("Handling request to '/rss.xml'");
+    let rss = engine.rss()?;
+    Ok(Response::new(Body::from(rss)))
 }
 
 /// Handler for "/:topic"
@@ -137,7 +146,7 @@ mod tests {
     #[tokio::test]
     async fn check_all_handlers() {
 	let dir = tempfile::tempdir().unwrap();
-	let mut src: &[u8] = b"Site Name\nAuthor Name\nOne, Two, Three, And More\nadmin\n";
+	let mut src: &[u8] = b"Site Name\nAuthor Name\nhttps://some.special.site\nOne, Two, Three, And More\nadmin\n";
 	let app = AppConfig::generate(&dir, &mut src).unwrap();
 	let engine = Engine::new(Arc::new(app));
 	let engine = Arc::new(engine);
@@ -229,6 +238,12 @@ One Important Test
 	    .body(Body::default())
 	    .unwrap();
 
+	let rss_request = Request::builder()
+	    .method("GET")
+	    .uri("http://localhost:9090/rss.xml")
+	    .body(Body::default())
+	    .unwrap();
+
 	let service = RouterService::new(router).unwrap();
 	let addr = format!("{}:{}", engine.app.server.bind, engine.app.server.port);
 	let addr: SocketAddr = addr.parse().unwrap();
@@ -256,12 +271,14 @@ One Important Test
 	let topic_asset_resp = client.request(topic_asset_request).await.unwrap();
 	let static_asset_resp = client.request(static_asset_request).await.unwrap();
 	let favicon_resp = client.request(favicon_request).await.unwrap();
+	let rss_resp = client.request(rss_request).await.unwrap();
 	assert_eq!(index_resp.status(), StatusCode::OK);
 	assert_eq!(post_resp.status(), StatusCode::OK);
 	assert_eq!(topic_resp.status(), StatusCode::OK);
 	assert_eq!(topic_asset_resp.status(), StatusCode::OK);
 	assert_eq!(static_asset_resp.status(), StatusCode::OK);
 	assert_eq!(favicon_resp.status(), StatusCode::OK);
+	assert_eq!(rss_resp.status(), StatusCode::OK);
 
 	let bad_topic_resp = client.request(bad_topic_request).await.unwrap();
 	let bad_post_resp = client.request(bad_post_request).await.unwrap();
@@ -305,6 +322,12 @@ One Important Test
 	    .body(Body::default())
 	    .unwrap();
 
+	let rss_request = Request::builder()
+	    .method("GET")
+	    .uri("http://localhost:8901/rss.xml")
+	    .body(Body::default())
+	    .unwrap();
+
 	let service = RouterService::new(router).unwrap();
 	let addr = format!("{}:{}", engine.app.server.bind, engine.app.server.port);
 	let addr: SocketAddr = addr.parse().unwrap();
@@ -330,10 +353,12 @@ One Important Test
 	let post_resp = client.request(post_request).await.unwrap();
 	let topic_resp = client.request(topic_request).await.unwrap();
 	let gallery_resp = client.request(gallery_request).await.unwrap();
+	let rss_resp = client.request(rss_request).await.unwrap();
 	assert_eq!(index_resp.status(), StatusCode::OK);
 	assert_eq!(post_resp.status(), StatusCode::OK);
 	assert_eq!(topic_resp.status(), StatusCode::OK);
 	assert_eq!(gallery_resp.status(), StatusCode::OK);
+	assert_eq!(rss_resp.status(), StatusCode::OK);
 	let _ = tx.send(());
     }
 

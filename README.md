@@ -7,6 +7,7 @@ and flexible base for serving sites using:
 * [pulldown-cmark](https://crates.io/crates/pulldown-cmark) for CommonMark rendering
 * [routerify](https://crates.io/crates/routerify) to serve the site
 * [simplecss](https://simplecss.org) for default styling
+* [rss](https://crates.io/crates/rss) for generating a full-site RSS feed
 
 ## Usage
 
@@ -22,6 +23,8 @@ Please enter a name for the site:
 Example Site
 Please enter the site author's name: 
 Arthur Writeson
+Please enter the base URL for your site:
+https://www.example.com
 Please enter comma-separated site topics: 
 one, two, three
 2021-05-01T17:34:26.501980660+00:00 [INFO] Creating site filesystem tree
@@ -36,6 +39,7 @@ An example config, as generated, is shown below:
 [site]
 name = 'Example Site'
 author = 'Arthur Writeson'
+url = 'https://www.example.com'
 template = 'default.tmpl'
 topics = [
     'one',
@@ -76,7 +80,9 @@ The following elements are available within the Tera context for rendering:
 * Items in `[docpaths]` are generated as full paths for completeness, however relative paths will work if desired
   * From the example above the user is free to simply use `site/templates` and `site/webroot` and move the directory out of `/home/user`
   * Note that `arse new` creates the site tree, and all other output files, in the current working directory.
-  * If `gallery` is one of the topics requested, a simple image slideshow will be generated for `/gallery/ext/*.jpg` with the same lexical reverse order as posts.
+* If `gallery` is one of the topics requested
+  * A simple image slideshow will be generated for `/gallery/ext/*.jpg`
+  * Display will follow the same lexical reverse order as posts.
 
 ## Path to 1.0
 
@@ -87,7 +93,7 @@ The following elements are available within the Tera context for rendering:
 - [x] Support custom bind address and port
 - [x] Support favicons
 - [x] Support a special `gallery` topic
-- [ ] Support RSS feeds
+- [x] Support RSS feeds
 
 ### License
 
