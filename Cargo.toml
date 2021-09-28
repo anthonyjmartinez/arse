@@ -1,6 +1,6 @@
 [package]
 name = "arse"
-version = "0.11.4"
+version = "0.11.5"
 authors = ["Anthony Martinez"]
 edition = "2018"
 license = "MIT OR Apache-2.0"
