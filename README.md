@@ -94,6 +94,7 @@ The following elements are available within the Tera context for rendering:
 - [x] Support favicons
 - [x] Support a special `gallery` topic
 - [x] Support RSS feeds
+- [ ] Support for adding/removing topics
 
 ### License
 
