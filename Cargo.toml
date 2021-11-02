@@ -1,8 +1,8 @@
 [package]
 name = "arse"
-version = "0.11.7"
+version = "0.12.0"
 authors = ["Anthony Martinez"]
-edition = "2018"
+edition = "2021"
 license = "MIT OR Apache-2.0"
 readme = "README.md"
 homepage = "https://git.staart.one/ajmartinez/arse"
