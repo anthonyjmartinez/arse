@@ -28,7 +28,7 @@ checksum = "61604a8f862e1d5c3229fdd78f8b02c68dcf73a4c4b05fd636d12240aaa242c1"
 
 [[package]]
 name = "arse"
-version = "0.11.7"
+version = "0.12.0"
 dependencies = [
  "anyhow",
  "chrono",
