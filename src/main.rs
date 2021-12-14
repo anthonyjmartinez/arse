@@ -15,17 +15,16 @@ copied, modified, or distributed except according to those terms.
 //! - `new`: Creates a new `[config]` TOML from user input, and creates
 //!          the site's directory structure.
 
-
 use std::net::SocketAddr;
 use std::sync::Arc;
 
 use anyhow::{anyhow, Context, Error, Result};
-use log::{info, error};
 use hyper::Server;
+use log::{error, info};
 use routerify::RouterService;
 
-mod config;
 mod common;
+mod config;
 mod render;
 mod routes;
 
@@ -37,7 +36,7 @@ async fn main() -> Result<()> {
 
     let engine = Arc::new(render::Engine::new(app));
     info!("Rendering Engine loaded");
-    
+
     let router = routes::router(engine.clone());
     info!("Route handlers loaded");
 
@@ -52,7 +51,7 @@ async fn main() -> Result<()> {
 
     info!("Running server on: {}", &addr);
     if let Err(err) = server.await {
-	error!("Server error: {}", err)
+        error!("Server error: {}", err)
     }
 
     Ok(())

@@ -25,7 +25,7 @@ use super::{Context, Result};
 /// On UNIX-like systems this creates the file with mode `0o600`.
 ///
 /// On Windows systems this sets the file to readonly.
-pub(crate) fn str_to_ro_file<P: AsRef<Path>>(content: &str, dest: P) -> Result<()> { 
+pub(crate) fn str_to_ro_file<P: AsRef<Path>>(content: &str, dest: P) -> Result<()> {
     debug!("Writing protected file: {}", &dest.as_ref().display());
     use std::fs::OpenOptions;
     use std::os::unix::fs::OpenOptionsExt;
@@ -33,15 +33,18 @@ pub(crate) fn str_to_ro_file<P: AsRef<Path>>(content: &str, dest: P) -> Result<(
     options.create(true);
     options.write(true);
     options.mode(0o600);
-    
+
     trace!("Opening '{}' to write", &dest.as_ref().display());
-    let mut ro_file = options.open(&dest)
-	.with_context(|| format!("failed to open '{}' for writing", &dest.as_ref().display()))?;
-    ro_file.write_all(content.as_bytes())
+    let mut ro_file = options
+        .open(&dest)
+        .with_context(|| format!("failed to open '{}' for writing", &dest.as_ref().display()))?;
+    ro_file
+        .write_all(content.as_bytes())
         .with_context(|| format!("failure writing '{}'", &dest.as_ref().display()))?;
     if !content.ends_with('\n') {
-	ro_file.write_all(b"\n")
-        .with_context(|| format!("failure writing '{}'", &dest.as_ref().display()))?;
+        ro_file
+            .write_all(b"\n")
+            .with_context(|| format!("failure writing '{}'", &dest.as_ref().display()))?;
     }
     trace!("Content written to destination");
     Ok(())
@@ -53,21 +56,26 @@ pub(crate) fn str_to_ro_file<P: AsRef<Path>>(content: &str, dest: P) -> Result<(
     trace!("Opening '{}' to write", &dest.as_ref().display());
     let mut ro_file = std::fs::File::create(&dest)
         .with_context(|| format!("failed to open '{}' for writing", &dest.as_ref().display()))?;
-    ro_file.write_all(content.as_bytes()).
-	with_context(|| format!("failure writing '{}'", &dest.as_ref().display()))?;
-    let metadata = ro_file.metadata()
-        .with_context(|| format!("failure retrieving metadata on '{}'", &dest.as_ref().display()))?;
+    ro_file
+        .write_all(content.as_bytes())
+        .with_context(|| format!("failure writing '{}'", &dest.as_ref().display()))?;
+    let metadata = ro_file.metadata().with_context(|| {
+        format!(
+            "failure retrieving metadata on '{}'",
+            &dest.as_ref().display()
+        )
+    })?;
     let mut perms = metadata.permissions();
     if !content.ends_with('\n') {
-	ro_file.write_all(b"\n")
-	    .with_context(|| format!("failure writing '{}'", &dest.as_ref().display()))?;
+        ro_file
+            .write_all(b"\n")
+            .with_context(|| format!("failure writing '{}'", &dest.as_ref().display()))?;
     }
     trace!("Content written to destination");
     trace!("Setting read-only on destination file");
     perms.set_readonly(true);
     Ok(())
 }
-
 
 /// Returns a `Result<Vec<Pathbuf>>` for a given pattern.
 ///
@@ -78,23 +86,22 @@ pub fn path_matches(pat: &str) -> Result<Vec<PathBuf>> {
     path.pop();
 
     if path.exists() {
-	debug!("Building topic content vector from {}", &pat);
-	let mut path_vec: Vec<PathBuf> = Vec::new();
+        debug!("Building topic content vector from {}", &pat);
+        let mut path_vec: Vec<PathBuf> = Vec::new();
 
-	trace!("Globbing {}", &pat);
-	let entries = glob(pat)
-	    .context("failure globbing paths")?;
+        trace!("Globbing {}", &pat);
+        let entries = glob(pat).context("failure globbing paths")?;
 
-	for entry in entries.filter_map(Result::ok) {
-	    trace!("Adding '{}' to topic content vector", &entry.display());
-	    path_vec.push(entry);
-	}
-    
-	trace!("Reversing topic content vector for LIFO site rendering");
-	path_vec.reverse();
-	Ok(path_vec)
+        for entry in entries.filter_map(Result::ok) {
+            trace!("Adding '{}' to topic content vector", &entry.display());
+            path_vec.push(entry);
+        }
+
+        trace!("Reversing topic content vector for LIFO site rendering");
+        path_vec.reverse();
+        Ok(path_vec)
     } else {
-	Err(anyhow!("No valid parent path for '{}'", &pat))
+        Err(anyhow!("No valid parent path for '{}'", &pat))
     }
 }
 
@@ -110,9 +117,9 @@ mod tests {
 
     #[test]
     fn invalid_parent_path() {
-	let dir = tempfile::tempdir().unwrap();
-	let pat = format!("{}/nope/*.md", dir.path().display());
-	let paths = path_matches(&pat);
-	assert!(paths.is_err());
+        let dir = tempfile::tempdir().unwrap();
+        let pat = format!("{}/nope/*.md", dir.path().display());
+        let paths = path_matches(&pat);
+        assert!(paths.is_err());
     }
 }
