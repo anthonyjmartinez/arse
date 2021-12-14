@@ -28,9 +28,10 @@ checksum = "8b26702f315f53b6071259e15dd9d64528213b44d61de1ec926eca7715d62203"
 
 [[package]]
 name = "arse"
-version = "0.13.0"
+version = "0.14.0"
 dependencies = [
  "anyhow",
+ "chrono",
  "clap",
  "glob",
  "hyper",
@@ -43,7 +44,6 @@ dependencies = [
  "simplelog",
  "tempfile",
  "tera",
- "time 0.3.5",
  "tokio",
  "toml",
 ]
@@ -146,7 +146,7 @@ dependencies = [
  "libc",
  "num-integer",
  "num-traits",
- "time 0.1.43",
+ "time",
  "winapi",
 ]
 
@@ -1152,15 +1152,6 @@ checksum = "ca8a50ef2360fbd1eeb0ecd46795a87a19024eb4b53c5dc916ca1fd95fe62438"
 dependencies = [
  "libc",
  "winapi",
-]
-
-[[package]]
-name = "time"
-version = "0.3.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "41effe7cfa8af36f439fac33861b66b049edc6f9a32331e2312660529c1c24ad"
-dependencies = [
- "libc",
 ]
 
 [[package]]

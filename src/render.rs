@@ -13,17 +13,16 @@ copied, modified, or distributed except according to those terms.
 use std::fs::File;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use std::time::SystemTime;
 
 use super::common;
 use super::config::AppConfig;
 use super::{Context, Result};
 
+use chrono::{DateTime, Utc};
 use log::{debug, trace};
 use pulldown_cmark::{html, Parser};
 use rss::{Channel, Item};
 use tera::{Context as TemplateContext, Tera};
-use time::OffsetDateTime;
 
 /// Static defaults for the rendering engine.g
 mod default;
@@ -229,13 +228,9 @@ impl Engine {
                 path.file_stem().unwrap().to_str().unwrap()
             );
             let f = File::open(&path)?;
-            let updated = f
-                .metadata()?
-                .modified()?
-                .duration_since(SystemTime::UNIX_EPOCH)?
-                .as_secs() as i64;
+            let updated: DateTime<Utc> = f.metadata()?.modified()?.into();
 
-            let updated = OffsetDateTime::from_unix_timestamp(updated)?.to_string();
+            let updated = updated.to_rfc2822();
 
             let description = Self::read_post_to_html(path)?;
 
