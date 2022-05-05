@@ -20,7 +20,6 @@ pub(crate) const TEMPLATE: &str = r#"
 </head>
 <body>
 <header>
-<center>
 <h1>{{ site.name }}</h1>
 <nav>
 <a href="/">Home</a>
@@ -29,7 +28,6 @@ pub(crate) const TEMPLATE: &str = r#"
 {%- endfor -%}
 <a href="/rss.xml">RSS</a>
 </nav>
-</center>
 </header>
 <main>
 {% if gallery %}
