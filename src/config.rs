@@ -62,7 +62,6 @@ fn args() -> Command<'static> {
 ///
 /// Returns: [`Result<AppConfig>`] or exits after generating a new config, and writing it to disk.
 pub(crate) fn load() -> Result<AppConfig> {
-    let config: Result<AppConfig>;
     let matches = args().get_matches();
 
     // Create a Config with ISO timestamps
@@ -81,31 +80,33 @@ pub(crate) fn load() -> Result<AppConfig> {
     info!("Logging started");
 
     debug!("Processing subcommands");
-    if matches.is_present("run") {
-        trace!("Application called with `run` subcommand - loading config from disk");
-        config = runner_config(matches);
-    } else if matches.is_present("new") {
-        trace!("Application called with `new` subcommand - creating config from user input");
-        let reader = std::io::stdin();
-        let mut reader = reader.lock();
-        let current_path =
-            std::env::current_dir().context("failed to get current working directory")?;
-        let _ = AppConfig::generate(current_path, &mut reader);
-        std::process::exit(0);
-    } else {
-        let msg = "Unable to load configuration".to_owned();
-        error!("{}", &msg);
-        config = Err(anyhow!("{}", msg));
-    }
+    let config: Result<AppConfig> = match matches.subcommand() {
+	Some(("run", run_m)) => {
+            trace!("Application called with `run` subcommand - loading config from disk");
+	    runner_config(run_m)
+	},
+	Some(("new", _)) => {
+            trace!("Application called with `new` subcommand - creating config from user input");
+            let reader = std::io::stdin();
+            let mut reader = reader.lock();
+            let current_path =
+		std::env::current_dir().context("failed to get current working directory")?;
+            let _ = AppConfig::generate(current_path, &mut reader);
+            std::process::exit(0);
+	},
+	_ => {
+            let msg = "Unable to load configuration".to_owned();
+            error!("{}", &msg);
+            Err(anyhow!("{}", msg))
+	}
+    };
 
     config
 }
 
-fn runner_config(m: ArgMatches) -> Result<AppConfig> {
-    if let Some(run) = m.subcommand_matches("run") {
-        let value = run.value_of("config").unwrap();
-        let config = AppConfig::from_path(value)?;
-        Ok(config)
+fn runner_config(m: &ArgMatches) -> Result<AppConfig> {
+    if let Some(value) = m.value_of("config") {
+	AppConfig::from_path(value)
     } else {
         let msg = "Failed to read arguments for 'run' subcommand".to_owned();
         error!("{}", &msg);
@@ -298,8 +299,10 @@ mod tests {
     fn build_run_config() {
         let arg_vec = vec!["arse", "run", "./test_files/test-config.toml"];
         let matches = args().get_matches_from(arg_vec);
-        let config = runner_config(matches);
-        assert!(config.is_ok());
+	if let Some(run_m) = matches.subcommand_matches("run") {
+	    let config = runner_config(run_m);
+            assert!(config.is_ok());
+	}
     }
 
     #[test]
