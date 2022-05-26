@@ -1,6 +1,6 @@
 /*
 A Rust Site Engine
-Copyright 2020-2021 Anthony Martinez
+Copyright 2020-2022 Anthony Martinez
 
 Licensed under the Apache License, Version 2.0, <LICENSE-APACHE or
 http://apache.org/licenses/LICENSE-2.0> or the MIT license <LICENSE-MIT or
@@ -167,7 +167,7 @@ mod tests {
 Main Important Test
 "#;
         let mut f = File::create(&dir.path().join("site/webroot/main/posts/index.md")).unwrap();
-        f.write_all(&index_page.as_bytes()).unwrap();
+        f.write_all(index_page.as_bytes()).unwrap();
 
         let topic_page = r#"
 ### One Section
@@ -175,7 +175,7 @@ Main Important Test
 One Important Test
 "#;
         let mut f = File::create(&dir.path().join("site/webroot/one/posts/index.md")).unwrap();
-        f.write_all(&topic_page.as_bytes()).unwrap();
+        f.write_all(topic_page.as_bytes()).unwrap();
 
         let topic_asset = b"One Static File\n";
 

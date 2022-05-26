@@ -1,6 +1,6 @@
 /*
 A Rust Site Engine
-Copyright 2020-2021 Anthony Martinez
+Copyright 2020-2022 Anthony Martinez
 
 Licensed under the Apache License, Version 2.0, <LICENSE-APACHE or
 http://apache.org/licenses/LICENSE-2.0> or the MIT license <LICENSE-MIT or
@@ -20,9 +20,7 @@ use std::fs::create_dir_all;
 use std::path::Path;
 use std::{io::BufRead, usize};
 
-use clap::{
-    crate_authors, crate_description, crate_version, App, AppSettings, Arg, ArgMatches, SubCommand,
-};
+use clap::{crate_authors, crate_description, crate_version, Command, Arg, ArgMatches};
 use log::{debug, error, info, trace};
 use serde::{Deserialize, Serialize};
 use simplelog::{ConfigBuilder, SimpleLogger};
@@ -30,23 +28,23 @@ use simplelog::{ConfigBuilder, SimpleLogger};
 use super::common;
 use super::{anyhow, Context, Result};
 
-fn args() -> App<'static, 'static> {
-    App::new("A Rust Site Engine")
+fn args() -> Command<'static> {
+    Command::new("A Rust Site Engine")
         .version(crate_version!())
         .author(crate_authors!())
         .about(crate_description!())
-        .setting(AppSettings::ArgRequiredElseHelp)
+        .arg_required_else_help(true)
         .arg(
-            Arg::with_name("verbosity")
-                .short("v")
-                .multiple(true)
+            Arg::new("verbosity")
+                .short('v')
+                .multiple_occurrences(true)
                 .help("Sets the log level. Default: INFO. -v = DEBUG, -vv = TRACE"),
         )
         .subcommand(
-            SubCommand::with_name("run")
+            Command::new("run")
                 .about("Run the site server")
                 .arg(
-                    Arg::with_name("config")
+                    Arg::new("config")
                         .help("Provides the path to the server configuration file.")
                         .required(true)
                         .takes_value(true)
@@ -54,7 +52,7 @@ fn args() -> App<'static, 'static> {
                 ),
         )
         .subcommand(
-            SubCommand::with_name("new").about(
+            Command::new("new").about(
                 "Generates a base directory structure and configuration file for a new site",
             ),
         )
