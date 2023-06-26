@@ -166,7 +166,7 @@ mod tests {
 
 Main Important Test
 "#;
-        let mut f = File::create(&dir.path().join("site/webroot/main/posts/index.md")).unwrap();
+        let mut f = File::create(dir.path().join("site/webroot/main/posts/index.md")).unwrap();
         f.write_all(index_page.as_bytes()).unwrap();
 
         let topic_page = r#"
@@ -174,22 +174,22 @@ Main Important Test
 
 One Important Test
 "#;
-        let mut f = File::create(&dir.path().join("site/webroot/one/posts/index.md")).unwrap();
+        let mut f = File::create(dir.path().join("site/webroot/one/posts/index.md")).unwrap();
         f.write_all(topic_page.as_bytes()).unwrap();
 
         let topic_asset = b"One Static File\n";
 
-        let mut f = File::create(&dir.path().join("site/webroot/one/ext/one-static")).unwrap();
+        let mut f = File::create(dir.path().join("site/webroot/one/ext/one-static")).unwrap();
         f.write_all(topic_asset).unwrap();
 
         let static_asset = b"Static File\n";
 
-        let mut f = File::create(&dir.path().join("site/webroot/static/main-static")).unwrap();
+        let mut f = File::create(dir.path().join("site/webroot/static/main-static")).unwrap();
         f.write_all(static_asset).unwrap();
 
         let favicon = b"Favicon File\n";
 
-        let mut f = File::create(&dir.path().join("site/webroot/static/favicon.ico")).unwrap();
+        let mut f = File::create(dir.path().join("site/webroot/static/favicon.ico")).unwrap();
         f.write_all(favicon).unwrap();
 
         let router = router(engine.clone());
