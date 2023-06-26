@@ -19,13 +19,13 @@ and flexible base for serving sites using:
 $ arse new
 2021-05-01T17:34:11.155427589+00:00 [INFO] Logging started
 2021-05-01T17:34:11.155543182+00:00 [INFO] Generating new site configuration
-Please enter a name for the site: 
+Please enter a name for the site:
 Example Site
-Please enter the site author's name: 
+Please enter the site author's name:
 Arthur Writeson
 Please enter the base URL for your site:
 https://www.example.com
-Please enter comma-separated site topics: 
+Please enter comma-separated site topics:
 one, two, three
 2021-05-01T17:34:26.501980660+00:00 [INFO] Creating site filesystem tree
 2021-05-01T17:34:26.504816188+00:00 [INFO] Writing site configuration to disk
@@ -42,9 +42,9 @@ author = 'Arthur Writeson'
 url = 'https://www.example.com'
 template = 'default.tmpl'
 topics = [
-    'one',
-    'two',
-    'three',
+	'one',
+	'two',
+	'three',
 ]
 
 [server]
@@ -54,6 +54,11 @@ port = 9090
 [docpaths]
 templates = '/home/user/site/templates'
 webroot = '/home/user/site/webroot'
+
+[mime_types]
+css = "text/css"
+gif = "image/gif"
+jpg = "image/jpeg"
 ```
 
 #### Rendering and Styling
@@ -83,6 +88,18 @@ The following elements are available within the Tera context for rendering:
 * If `gallery` is one of the topics requested
   * A simple image slideshow will be generated for `/gallery/ext/*.jpg`
   * Display will follow the same lexical reverse order as posts.
+
+#### MIME types
+
+Version `0.16.0` added a `mime_types` section to the `config.toml` file. This is created with a minimal set of
+mappings from a file extension to the desired MIME type. These mappings are used when serving files from:
+
+- `static/`
+- `:topic/ext/`
+
+If there is no match for the extension, or the file lacks an extension entirely, the default is `text/plain`.
+As such, if you wish for maximimum compatibility with different reverse proxies, browsers, or other applications
+it is crticial that you set an appropriate MIME type for each possible extension you intend to serve directly.
 
 ## Path to 1.0
 
