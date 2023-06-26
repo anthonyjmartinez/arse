@@ -1,6 +1,6 @@
 [package]
 name = "arse"
-version = "0.15.1"
+version = "0.16.0"
 authors = ["Anthony Martinez"]
 edition = "2021"
 license = "MIT OR Apache-2.0"
@@ -20,15 +20,15 @@ clap = { version = "3", features = ["cargo"] }
 glob = "0.3.0"
 hyper = { version = "0.14", features = ["client", "http1", "server"] }
 log = "0.4"
-pulldown-cmark = { version = "0.8", default-features = false, features = ["simd"] }
+pulldown-cmark = { version = "0.9", default-features = false, features = ["simd"] }
 rand = "0.8"
 routerify = "3"
 rss = "2"
 serde = { version = "1", features = ["derive"] }
-simplelog = "0.11"
+simplelog = "0.12"
 tera = "1"
 tokio = { version = "1", features = ["full"] }
-toml = "0.5"
+toml = "0.7"
 
 [dev-dependencies]
 tempfile = "3"
