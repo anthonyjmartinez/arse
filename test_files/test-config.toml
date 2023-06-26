@@ -12,3 +12,8 @@ port = 8901
 [docpaths]
 templates = "test_files/site/templates"
 webroot = "test_files/site/webroot"
+
+[mime]
+css = "text/css"
+gif = "image/gif"
+jpg = "image/jpeg"
