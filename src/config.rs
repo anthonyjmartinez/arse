@@ -16,6 +16,7 @@ copied, modified, or distributed except according to those terms.
 //! - Loading application configuration from disk (when `arse run /path/to/config` is called)
 //! - Generating a new application configuration and directory structure (when `arse new` is called)
 
+use std::collections::HashMap;
 use std::fs::create_dir_all;
 use std::path::Path;
 use std::{io::BufRead, usize};
@@ -213,12 +214,14 @@ impl DocPaths {
     }
 }
 
+
 /// Provides the overall application configuration used by the server and rendering engine.
 #[derive(Debug, Deserialize, Serialize, PartialEq)]
 pub(crate) struct AppConfig {
     pub site: Site,
     pub server: Server,
     pub docpaths: DocPaths,
+    pub mime_types: HashMap<String, String>,
 }
 
 impl AppConfig {
@@ -248,11 +251,17 @@ impl AppConfig {
         let docpaths = DocPaths::new(&dir);
         let site = Site::new_from_input(reader)?;
         let server = Server::new();
+	let mime_types: HashMap<String, String> = HashMap::from([
+	    ("css".into(), "text/css".into()),
+	    ("gif".into(), "image/gif".into()),
+	    ("jpg".into(), "image/jpeg".into()),
+	]);
 
         let config = AppConfig {
             site,
             server,
             docpaths,
+	    mime_types,
         };
 
         config
@@ -286,7 +295,7 @@ impl AppConfig {
         info!("Writing site configuration to disk");
         let config = toml::to_string_pretty(&self).context("failure creating TOML")?;
         let conf_path = &dir.as_ref().join("config.toml");
-        common::str_to_ro_file(&config, &conf_path)?;
+        common::str_to_ro_file(&config, conf_path)?;
         Ok(())
     }
 }
