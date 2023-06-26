@@ -282,10 +282,10 @@ Very cool, but maybe not super useful
 Super Wow!
 "#;
 
-        let mut f = File::create(&dir.path().join("site/webroot/one/posts/post1.md")).unwrap();
+        let mut f = File::create(dir.path().join("site/webroot/one/posts/post1.md")).unwrap();
         f.write_all(post.as_bytes()).unwrap();
 
-        let mut f = File::create(&dir.path().join("site/webroot/one/posts/post2.md")).unwrap();
+        let mut f = File::create(dir.path().join("site/webroot/one/posts/post2.md")).unwrap();
         f.write_all(post2.as_bytes()).unwrap();
 
         let page1 = engine.render_post("one", "post1").unwrap();
@@ -315,10 +315,10 @@ Very cool, but maybe not super useful
 Super Wow!
 "#;
 
-        let mut f = File::create(&dir.path().join("site/webroot/one/posts/post1.md")).unwrap();
+        let mut f = File::create(dir.path().join("site/webroot/one/posts/post1.md")).unwrap();
         f.write_all(post.as_bytes()).unwrap();
 
-        let mut f = File::create(&dir.path().join("site/webroot/one/posts/post2.md")).unwrap();
+        let mut f = File::create(dir.path().join("site/webroot/one/posts/post2.md")).unwrap();
         f.write_all(post2.as_bytes()).unwrap();
 
         let page = engine.render_topic("one").unwrap();
@@ -353,10 +353,10 @@ Super Wow!
         let fake_img = "some bytes";
         let fake_img_2 = "some more bytes";
 
-        let mut f = File::create(&dir.path().join("site/webroot/gallery/ext/0.jpg")).unwrap();
+        let mut f = File::create(dir.path().join("site/webroot/gallery/ext/0.jpg")).unwrap();
         f.write_all(fake_img.as_bytes()).unwrap();
 
-        let mut f = File::create(&dir.path().join("site/webroot/gallery/ext/1.jpg")).unwrap();
+        let mut f = File::create(dir.path().join("site/webroot/gallery/ext/1.jpg")).unwrap();
         f.write_all(fake_img_2.as_bytes()).unwrap();
         let page = engine.render_topic("gallery").unwrap();
 
