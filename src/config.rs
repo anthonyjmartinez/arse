@@ -65,7 +65,7 @@ pub(crate) fn load() -> Result<AppConfig> {
     let matches = args().get_matches();
 
     // Create a Config with ISO timestamps
-    let log_config = ConfigBuilder::new().set_time_format_str("%+").build();
+    let log_config = ConfigBuilder::new().set_time_format_rfc3339().build();
 
     // After this block logging is configured at the specified level
     match matches.occurrences_of("verbosity") {
