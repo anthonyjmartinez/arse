@@ -13,7 +13,7 @@ port = 8901
 templates = "test_files/site/templates"
 webroot = "test_files/site/webroot"
 
-[mime]
+[mime_types]
 css = "text/css"
 gif = "image/gif"
 jpg = "image/jpeg"
