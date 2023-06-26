@@ -10,6 +10,8 @@ copied, modified, or distributed except according to those terms.
 
 //! Provides an HTTP route handler using [`Engine`] to serve content with [`routerify`].
 
+use std::collections::HashMap;
+use std::ffi::OsStr;
 use std::fs::File;
 use std::io::prelude::*;
 use std::path::Path;
@@ -26,17 +28,32 @@ use super::{Context, Error, Result};
 pub(crate) fn router(engine: Arc<Engine>) -> Router<Body, Error> {
     debug!("Building site router");
     Router::builder()
-        .data(engine)
-        .get("/static/:fname", static_assets)
-        .get("/favicon.ico", favicon)
-        .get("/rss.xml", rss_handler)
-        .get("/:topic", topic_handler)
-        .get("/:topic/ext/:fname", topic_assets)
-        .get("/:topic/posts/:post", post_handler)
-        .get("/", index_handler)
-        .err_handler(error_handler)
-        .build()
-        .unwrap()
+	.data(engine)
+	.get("/static/:fname", static_assets)
+	.get("/favicon.ico", favicon)
+	.get("/rss.xml", rss_handler)
+	.get("/:topic", topic_handler)
+	.get("/:topic/ext/:fname", topic_assets)
+	.get("/:topic/posts/:post", post_handler)
+	.get("/", index_handler)
+	.err_handler(error_handler)
+	.build()
+	.unwrap()
+}
+
+/// Returns the MIME type given by the user's config for a particular extension.
+/// By default this returns "text/plain" if no value is found. This makes it
+/// critical for users to set MIME types for any file they intend to serve that
+/// is not capable of being rendered as plaintext.
+fn mime_from_ext(ext: Option<&OsStr>, mime_map: &HashMap<String, String>) -> String {
+    if let Some(e) = ext {
+	let e_string = e.to_str().unwrap_or_default();
+	if let Some(m) = mime_map.get(e_string) {
+	    return m.clone()
+	}
+    }
+
+    String::from("text/plain")
 }
 
 /// Handles errors from either bad requests or server errors
@@ -44,9 +61,10 @@ pub(crate) async fn error_handler(err: RouteError) -> Response<Body> {
     error!("{}", err);
 
     Response::builder()
-        .status(StatusCode::NOT_FOUND)
-        .body(Body::from("Not Found"))
-        .unwrap()
+	.status(StatusCode::NOT_FOUND)
+	.header("content-type", "text/plain")
+	.body(Body::from("Not Found"))
+	.unwrap()
 }
 
 /// Handler for "/"
@@ -61,7 +79,12 @@ async fn rss_handler(req: Request<Body>) -> Result<Response<Body>> {
     let engine = req.data::<Arc<Engine>>().unwrap();
     info!("Handling request to '/rss.xml'");
     let rss = engine.rss()?;
-    Ok(Response::new(Body::from(rss)))
+
+    let response = Response::builder()
+	.header("content-type", "application/rss+xml")
+	.body(Body::from(rss))?;
+
+    Ok(response)
 }
 
 /// Handler for "/:topic"
@@ -75,9 +98,13 @@ async fn topic_handler(req: Request<Body>) -> Result<Response<Body>> {
 /// Called by topic_handler to dynamically generate topic pages
 async fn topic_posts(engine: Arc<Engine>, topic: String) -> Result<Response<Body>> {
     let output = engine
-        .render_topic(&topic)
-        .with_context(|| format!("failed to render topic: {}", &topic))?;
-    Ok(Response::new(Body::from(output)))
+	.render_topic(&topic)
+	.with_context(|| format!("failed to render topic: {}", &topic))?;
+
+    let response = Response::builder()
+	.header("content-type", "text-html")
+	.body(Body::from(output))?;
+    Ok(response)
 }
 
 /// Handler for "/static/:fname"
@@ -86,14 +113,19 @@ async fn static_assets(req: Request<Body>) -> Result<Response<Body>> {
     let resource = req.param("fname").unwrap();
     info!("Handling static asset: '/static/{}'", &resource);
     let static_path = Path::new(&engine.app.docpaths.webroot)
-        .join("static")
-        .join(resource);
+	.join("static")
+	.join(resource);
     let mut f = File::open(&static_path)
-        .with_context(|| format!("failed to open '{}'", &static_path.display()))?;
+	.with_context(|| format!("failed to open '{}'", &static_path.display()))?;
     let mut buf = Vec::new();
     f.read_to_end(&mut buf)
-        .context("failed to read to buffer")?;
-    Ok(Response::new(Body::from(buf)))
+	.context("failed to read to buffer")?;
+
+    let response = Response::builder()
+	.header("content-type", mime_from_ext(static_path.extension(), &engine.app.mime_types))
+	.body(Body::from(buf))?;
+
+    Ok(response)
 }
 
 /// Handler for "/favicon.ico"
@@ -101,14 +133,18 @@ async fn favicon(req: Request<Body>) -> Result<Response<Body>> {
     let engine = req.data::<Arc<Engine>>().unwrap();
     info!("Handling favicon request");
     let favicon_path = Path::new(&engine.app.docpaths.webroot)
-        .join("static")
-        .join("favicon.ico");
+	.join("static")
+	.join("favicon.ico");
     let mut f = File::open(&favicon_path)
-        .with_context(|| format!("failed to open '{}'", &favicon_path.display()))?;
+	.with_context(|| format!("failed to open '{}'", &favicon_path.display()))?;
     let mut buf = Vec::new();
     f.read_to_end(&mut buf)
-        .context("failed to read to buffer")?;
-    Ok(Response::new(Body::from(buf)))
+	.context("failed to read to buffer")?;
+
+    let response = Response::builder()
+	.header("content-type", "image/vnd.microsoft.icon")
+	.body(Body::from(buf))?;
+    Ok(response)
 }
 
 /// Handler for "/:topic/ext/:fname"
@@ -118,15 +154,20 @@ async fn topic_assets(req: Request<Body>) -> Result<Response<Body>> {
     let resource = req.param("fname").unwrap();
     info!("Handling static asset: '/{}/ext/{}'", &topic, &resource);
     let topic_asset_path = Path::new(&engine.app.docpaths.webroot)
-        .join(topic)
-        .join("ext")
-        .join(resource);
+	.join(topic)
+	.join("ext")
+	.join(resource);
     let mut f = File::open(&topic_asset_path)
-        .with_context(|| format!("failed to open '{}'", &topic_asset_path.display()))?;
+	.with_context(|| format!("failed to open '{}'", &topic_asset_path.display()))?;
     let mut buf = Vec::new();
     f.read_to_end(&mut buf)
-        .context("failed to read to buffer")?;
-    Ok(Response::new(Body::from(buf)))
+	.context("failed to read to buffer")?;
+
+    let response = Response::builder()
+	.header("content-type", mime_from_ext(topic_asset_path.extension(), &engine.app.mime_types))
+	.body(Body::from(buf))?;
+
+    Ok(response)
 }
 
 /// Handler for "/:topic/:post"
@@ -136,9 +177,14 @@ async fn post_handler(req: Request<Body>) -> Result<Response<Body>> {
     let post = req.param("post").unwrap();
     info!("Handling topic post: '/{}/posts/{}'", &topic, &post);
     let output = engine
-        .render_post(topic, post)
-        .with_context(|| format!("failed to render: '{}/posts/{}'", topic, post))?;
-    Ok(Response::new(Body::from(output)))
+	.render_post(topic, post)
+	.with_context(|| format!("failed to render: '{}/posts/{}'", topic, post))?;
+
+    let response = Response::builder()
+	.header("content-type", "text/html")
+	.body(Body::from(output))?;
+
+    Ok(response)
 }
 
 #[cfg(test)]
@@ -155,218 +201,218 @@ mod tests {
 
     #[tokio::test]
     async fn check_all_handlers() {
-        let dir = tempfile::tempdir().unwrap();
-        let mut src: &[u8] = b"Site Name\nAuthor Name\nhttps://some.special.site\nOne, Two, Three, And More\nadmin\n";
-        let app = AppConfig::generate(&dir, &mut src).unwrap();
-        let engine = Engine::new(Arc::new(app));
-        let engine = Arc::new(engine);
+	let dir = tempfile::tempdir().unwrap();
+	let mut src: &[u8] = b"Site Name\nAuthor Name\nhttps://some.special.site\nOne, Two, Three, And More\nadmin\n";
+	let app = AppConfig::generate(&dir, &mut src).unwrap();
+	let engine = Engine::new(Arc::new(app));
+	let engine = Arc::new(engine);
 
-        let index_page = r#"
+	let index_page = r#"
 ### Main Page
 
 Main Important Test
 "#;
-        let mut f = File::create(dir.path().join("site/webroot/main/posts/index.md")).unwrap();
-        f.write_all(index_page.as_bytes()).unwrap();
+	let mut f = File::create(dir.path().join("site/webroot/main/posts/index.md")).unwrap();
+	f.write_all(index_page.as_bytes()).unwrap();
 
-        let topic_page = r#"
+	let topic_page = r#"
 ### One Section
 
 One Important Test
 "#;
-        let mut f = File::create(dir.path().join("site/webroot/one/posts/index.md")).unwrap();
-        f.write_all(topic_page.as_bytes()).unwrap();
+	let mut f = File::create(dir.path().join("site/webroot/one/posts/index.md")).unwrap();
+	f.write_all(topic_page.as_bytes()).unwrap();
 
-        let topic_asset = b"One Static File\n";
+	let topic_asset = b"One Static File\n";
 
-        let mut f = File::create(dir.path().join("site/webroot/one/ext/one-static")).unwrap();
-        f.write_all(topic_asset).unwrap();
+	let mut f = File::create(dir.path().join("site/webroot/one/ext/one-static")).unwrap();
+	f.write_all(topic_asset).unwrap();
 
-        let static_asset = b"Static File\n";
+	let static_asset = b"Static File\n";
 
-        let mut f = File::create(dir.path().join("site/webroot/static/main-static")).unwrap();
-        f.write_all(static_asset).unwrap();
+	let mut f = File::create(dir.path().join("site/webroot/static/main-static")).unwrap();
+	f.write_all(static_asset).unwrap();
 
-        let favicon = b"Favicon File\n";
+	let favicon = b"Favicon File\n";
 
-        let mut f = File::create(dir.path().join("site/webroot/static/favicon.ico")).unwrap();
-        f.write_all(favicon).unwrap();
+	let mut f = File::create(dir.path().join("site/webroot/static/favicon.ico")).unwrap();
+	f.write_all(favicon).unwrap();
 
-        let router = router(engine.clone());
+	let router = router(engine.clone());
 
-        let index_request = Request::builder()
-            .method("GET")
-            .uri("http://localhost:9090")
-            .body(Body::default())
-            .unwrap();
+	let index_request = Request::builder()
+	    .method("GET")
+	    .uri("http://localhost:9090")
+	    .body(Body::default())
+	    .unwrap();
 
-        let post_request = Request::builder()
-            .method("GET")
-            .uri("http://localhost:9090/one/posts/index")
-            .body(Body::default())
-            .unwrap();
+	let post_request = Request::builder()
+	    .method("GET")
+	    .uri("http://localhost:9090/one/posts/index")
+	    .body(Body::default())
+	    .unwrap();
 
-        let topic_request = Request::builder()
-            .method("GET")
-            .uri("http://localhost:9090/one")
-            .body(Body::default())
-            .unwrap();
+	let topic_request = Request::builder()
+	    .method("GET")
+	    .uri("http://localhost:9090/one")
+	    .body(Body::default())
+	    .unwrap();
 
-        let topic_asset_request = Request::builder()
-            .method("GET")
-            .uri("http://localhost:9090/one/ext/one-static")
-            .body(Body::default())
-            .unwrap();
+	let topic_asset_request = Request::builder()
+	    .method("GET")
+	    .uri("http://localhost:9090/one/ext/one-static")
+	    .body(Body::default())
+	    .unwrap();
 
-        let static_asset_request = Request::builder()
-            .method("GET")
-            .uri("http://localhost:9090/static/main-static")
-            .body(Body::default())
-            .unwrap();
+	let static_asset_request = Request::builder()
+	    .method("GET")
+	    .uri("http://localhost:9090/static/main-static")
+	    .body(Body::default())
+	    .unwrap();
 
-        let favicon_request = Request::builder()
-            .method("GET")
-            .uri("http://localhost:9090/favicon.ico")
-            .body(Body::default())
-            .unwrap();
+	let favicon_request = Request::builder()
+	    .method("GET")
+	    .uri("http://localhost:9090/favicon.ico")
+	    .body(Body::default())
+	    .unwrap();
 
-        let bad_topic_request = Request::builder()
-            .method("GET")
-            .uri("http://localhost:9090/badtopic")
-            .body(Body::default())
-            .unwrap();
+	let bad_topic_request = Request::builder()
+	    .method("GET")
+	    .uri("http://localhost:9090/badtopic")
+	    .body(Body::default())
+	    .unwrap();
 
-        let bad_post_request = Request::builder()
-            .method("GET")
-            .uri("http://localhost:9090/one/posts/nope")
-            .body(Body::default())
-            .unwrap();
+	let bad_post_request = Request::builder()
+	    .method("GET")
+	    .uri("http://localhost:9090/one/posts/nope")
+	    .body(Body::default())
+	    .unwrap();
 
-        let bad_static_request = Request::builder()
-            .method("GET")
-            .uri("http://localhost:9090/static/nope")
-            .body(Body::default())
-            .unwrap();
+	let bad_static_request = Request::builder()
+	    .method("GET")
+	    .uri("http://localhost:9090/static/nope")
+	    .body(Body::default())
+	    .unwrap();
 
-        let rss_request = Request::builder()
-            .method("GET")
-            .uri("http://localhost:9090/rss.xml")
-            .body(Body::default())
-            .unwrap();
+	let rss_request = Request::builder()
+	    .method("GET")
+	    .uri("http://localhost:9090/rss.xml")
+	    .body(Body::default())
+	    .unwrap();
 
-        let service = RouterService::new(router).unwrap();
-        let addr = format!("{}:{}", engine.app.server.bind, engine.app.server.port);
-        let addr: SocketAddr = addr.parse().unwrap();
+	let service = RouterService::new(router).unwrap();
+	let addr = format!("{}:{}", engine.app.server.bind, engine.app.server.port);
+	let addr: SocketAddr = addr.parse().unwrap();
 
-        let (tx, rx) = channel::<()>();
+	let (tx, rx) = channel::<()>();
 
-        let server = Server::bind(&addr).serve(service);
+	let server = Server::bind(&addr).serve(service);
 
-        let graceful = server.with_graceful_shutdown(async {
-            rx.await.ok();
-        });
+	let graceful = server.with_graceful_shutdown(async {
+	    rx.await.ok();
+	});
 
-        tokio::spawn(async move {
-            if let Err(e) = graceful.await {
-                println!("Encountered error: {}", e)
-            }
-        });
+	tokio::spawn(async move {
+	    if let Err(e) = graceful.await {
+		println!("Encountered error: {}", e)
+	    }
+	});
 
-        let client = Client::new();
+	let client = Client::new();
 
-        let index_resp = client.request(index_request).await.unwrap();
-        let post_resp = client.request(post_request).await.unwrap();
-        let topic_resp = client.request(topic_request).await.unwrap();
-        let topic_asset_resp = client.request(topic_asset_request).await.unwrap();
-        let static_asset_resp = client.request(static_asset_request).await.unwrap();
-        let favicon_resp = client.request(favicon_request).await.unwrap();
-        let rss_resp = client.request(rss_request).await.unwrap();
-        assert_eq!(index_resp.status(), StatusCode::OK);
-        assert_eq!(post_resp.status(), StatusCode::OK);
-        assert_eq!(topic_resp.status(), StatusCode::OK);
-        assert_eq!(topic_asset_resp.status(), StatusCode::OK);
-        assert_eq!(static_asset_resp.status(), StatusCode::OK);
-        assert_eq!(favicon_resp.status(), StatusCode::OK);
-        assert_eq!(rss_resp.status(), StatusCode::OK);
+	let index_resp = client.request(index_request).await.unwrap();
+	let post_resp = client.request(post_request).await.unwrap();
+	let topic_resp = client.request(topic_request).await.unwrap();
+	let topic_asset_resp = client.request(topic_asset_request).await.unwrap();
+	let static_asset_resp = client.request(static_asset_request).await.unwrap();
+	let favicon_resp = client.request(favicon_request).await.unwrap();
+	let rss_resp = client.request(rss_request).await.unwrap();
+	assert_eq!(index_resp.status(), StatusCode::OK);
+	assert_eq!(post_resp.status(), StatusCode::OK);
+	assert_eq!(topic_resp.status(), StatusCode::OK);
+	assert_eq!(topic_asset_resp.status(), StatusCode::OK);
+	assert_eq!(static_asset_resp.status(), StatusCode::OK);
+	assert_eq!(favicon_resp.status(), StatusCode::OK);
+	assert_eq!(rss_resp.status(), StatusCode::OK);
 
-        let bad_topic_resp = client.request(bad_topic_request).await.unwrap();
-        let bad_post_resp = client.request(bad_post_request).await.unwrap();
-        let bad_static_resp = client.request(bad_static_request).await.unwrap();
-        assert_eq!(bad_topic_resp.status(), StatusCode::NOT_FOUND);
-        assert_eq!(bad_post_resp.status(), StatusCode::NOT_FOUND);
-        assert_eq!(bad_static_resp.status(), StatusCode::NOT_FOUND);
+	let bad_topic_resp = client.request(bad_topic_request).await.unwrap();
+	let bad_post_resp = client.request(bad_post_request).await.unwrap();
+	let bad_static_resp = client.request(bad_static_request).await.unwrap();
+	assert_eq!(bad_topic_resp.status(), StatusCode::NOT_FOUND);
+	assert_eq!(bad_post_resp.status(), StatusCode::NOT_FOUND);
+	assert_eq!(bad_static_resp.status(), StatusCode::NOT_FOUND);
 
-        let _ = tx.send(());
+	let _ = tx.send(());
     }
 
     #[tokio::test]
     async fn check_custom_config() {
-        let app = AppConfig::from_path("test_files/test-config.toml").unwrap();
-        let engine = Engine::new(Arc::new(app));
-        let engine = Arc::new(engine);
+	let app = AppConfig::from_path("test_files/test-config.toml").unwrap();
+	let engine = Engine::new(Arc::new(app));
+	let engine = Arc::new(engine);
 
-        let router = router(engine.clone());
+	let router = router(engine.clone());
 
-        let index_request = Request::builder()
-            .method("GET")
-            .uri("http://localhost:8901")
-            .body(Body::default())
-            .unwrap();
+	let index_request = Request::builder()
+	    .method("GET")
+	    .uri("http://localhost:8901")
+	    .body(Body::default())
+	    .unwrap();
 
-        let post_request = Request::builder()
-            .method("GET")
-            .uri("http://localhost:8901/one/posts/1")
-            .body(Body::default())
-            .unwrap();
+	let post_request = Request::builder()
+	    .method("GET")
+	    .uri("http://localhost:8901/one/posts/1")
+	    .body(Body::default())
+	    .unwrap();
 
-        let topic_request = Request::builder()
-            .method("GET")
-            .uri("http://localhost:8901/one")
-            .body(Body::default())
-            .unwrap();
+	let topic_request = Request::builder()
+	    .method("GET")
+	    .uri("http://localhost:8901/one")
+	    .body(Body::default())
+	    .unwrap();
 
-        let gallery_request = Request::builder()
-            .method("GET")
-            .uri("http://localhost:8901/gallery")
-            .body(Body::default())
-            .unwrap();
+	let gallery_request = Request::builder()
+	    .method("GET")
+	    .uri("http://localhost:8901/gallery")
+	    .body(Body::default())
+	    .unwrap();
 
-        let rss_request = Request::builder()
-            .method("GET")
-            .uri("http://localhost:8901/rss.xml")
-            .body(Body::default())
-            .unwrap();
+	let rss_request = Request::builder()
+	    .method("GET")
+	    .uri("http://localhost:8901/rss.xml")
+	    .body(Body::default())
+	    .unwrap();
 
-        let service = RouterService::new(router).unwrap();
-        let addr = format!("{}:{}", engine.app.server.bind, engine.app.server.port);
-        let addr: SocketAddr = addr.parse().unwrap();
+	let service = RouterService::new(router).unwrap();
+	let addr = format!("{}:{}", engine.app.server.bind, engine.app.server.port);
+	let addr: SocketAddr = addr.parse().unwrap();
 
-        let (tx, rx) = channel::<()>();
+	let (tx, rx) = channel::<()>();
 
-        let server = Server::bind(&addr).serve(service);
+	let server = Server::bind(&addr).serve(service);
 
-        let graceful = server.with_graceful_shutdown(async {
-            rx.await.ok();
-        });
+	let graceful = server.with_graceful_shutdown(async {
+	    rx.await.ok();
+	});
 
-        tokio::spawn(async move {
-            if let Err(e) = graceful.await {
-                println!("Encountered error: {}", e)
-            }
-        });
+	tokio::spawn(async move {
+	    if let Err(e) = graceful.await {
+		println!("Encountered error: {}", e)
+	    }
+	});
 
-        let client = Client::new();
+	let client = Client::new();
 
-        let index_resp = client.request(index_request).await.unwrap();
-        let post_resp = client.request(post_request).await.unwrap();
-        let topic_resp = client.request(topic_request).await.unwrap();
-        let gallery_resp = client.request(gallery_request).await.unwrap();
-        let rss_resp = client.request(rss_request).await.unwrap();
-        assert_eq!(index_resp.status(), StatusCode::OK);
-        assert_eq!(post_resp.status(), StatusCode::OK);
-        assert_eq!(topic_resp.status(), StatusCode::OK);
-        assert_eq!(gallery_resp.status(), StatusCode::OK);
-        assert_eq!(rss_resp.status(), StatusCode::OK);
-        let _ = tx.send(());
+	let index_resp = client.request(index_request).await.unwrap();
+	let post_resp = client.request(post_request).await.unwrap();
+	let topic_resp = client.request(topic_request).await.unwrap();
+	let gallery_resp = client.request(gallery_request).await.unwrap();
+	let rss_resp = client.request(rss_request).await.unwrap();
+	assert_eq!(index_resp.status(), StatusCode::OK);
+	assert_eq!(post_resp.status(), StatusCode::OK);
+	assert_eq!(topic_resp.status(), StatusCode::OK);
+	assert_eq!(gallery_resp.status(), StatusCode::OK);
+	assert_eq!(rss_resp.status(), StatusCode::OK);
+	let _ = tx.send(());
     }
 }
