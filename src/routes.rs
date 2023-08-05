@@ -12,8 +12,8 @@ copied, modified, or distributed except according to those terms.
 
 use std::collections::HashMap;
 use std::ffi::OsStr;
-use std::fs::File;
-use std::io::prelude::*;
+use tokio::fs::File;
+use tokio::io::AsyncReadExt;
 use std::path::Path;
 use std::sync::Arc;
 
@@ -78,7 +78,7 @@ async fn index_handler(req: Request<Body>) -> Result<Response<Body>> {
 async fn rss_handler(req: Request<Body>) -> Result<Response<Body>> {
     let engine = req.data::<Arc<Engine>>().unwrap();
     info!("Handling request to '/rss.xml'");
-    let rss = engine.rss()?;
+    let rss = engine.rss().await?;
 
     let response = Response::builder()
 	.header("content-type", "application/rss+xml")
@@ -99,6 +99,7 @@ async fn topic_handler(req: Request<Body>) -> Result<Response<Body>> {
 async fn topic_posts(engine: Arc<Engine>, topic: String) -> Result<Response<Body>> {
     let output = engine
 	.render_topic(&topic)
+	.await
 	.with_context(|| format!("failed to render topic: {}", &topic))?;
 
     let response = Response::builder()
@@ -116,9 +117,11 @@ async fn static_assets(req: Request<Body>) -> Result<Response<Body>> {
 	.join("static")
 	.join(resource);
     let mut f = File::open(&static_path)
+	.await
 	.with_context(|| format!("failed to open '{}'", &static_path.display()))?;
     let mut buf = Vec::new();
     f.read_to_end(&mut buf)
+	.await
 	.context("failed to read to buffer")?;
 
     let response = Response::builder()
@@ -136,9 +139,11 @@ async fn favicon(req: Request<Body>) -> Result<Response<Body>> {
 	.join("static")
 	.join("favicon.ico");
     let mut f = File::open(&favicon_path)
+	.await
 	.with_context(|| format!("failed to open '{}'", &favicon_path.display()))?;
     let mut buf = Vec::new();
     f.read_to_end(&mut buf)
+	.await
 	.context("failed to read to buffer")?;
 
     let response = Response::builder()
@@ -158,9 +163,11 @@ async fn topic_assets(req: Request<Body>) -> Result<Response<Body>> {
 	.join("ext")
 	.join(resource);
     let mut f = File::open(&topic_asset_path)
+	.await
 	.with_context(|| format!("failed to open '{}'", &topic_asset_path.display()))?;
     let mut buf = Vec::new();
     f.read_to_end(&mut buf)
+	.await
 	.context("failed to read to buffer")?;
 
     let response = Response::builder()
@@ -178,6 +185,7 @@ async fn post_handler(req: Request<Body>) -> Result<Response<Body>> {
     info!("Handling topic post: '/{}/posts/{}'", &topic, &post);
     let output = engine
 	.render_post(topic, post)
+	.await
 	.with_context(|| format!("failed to render: '{}/posts/{}'", topic, post))?;
 
     let response = Response::builder()
