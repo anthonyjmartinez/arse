@@ -1,6 +1,6 @@
 /*
 A Rust Site Engine
-Copyright 2020-2023 Anthony Martinez
+Copyright 2020-2024 Anthony Martinez
 
 Licensed under the Apache License, Version 2.0, <LICENSE-APACHE or
 http://apache.org/licenses/LICENSE-2.0> or the MIT license <LICENSE-MIT or
@@ -21,7 +21,7 @@ use std::fs::create_dir_all;
 use std::path::Path;
 use std::{io::BufRead, usize};
 
-use clap::{crate_authors, crate_description, crate_version, Command, Arg, ArgMatches};
+use clap::{crate_authors, crate_description, crate_version, Arg, ArgAction, ArgMatches, Command};
 use log::{debug, error, info, trace};
 use serde::{Deserialize, Serialize};
 use simplelog::{ConfigBuilder, SimpleLogger};
@@ -29,7 +29,7 @@ use simplelog::{ConfigBuilder, SimpleLogger};
 use super::common;
 use super::{anyhow, Context, Result};
 
-fn args() -> Command<'static> {
+fn args() -> Command {
     Command::new("A Rust Site Engine")
         .version(crate_version!())
         .author(crate_authors!())
@@ -38,7 +38,7 @@ fn args() -> Command<'static> {
         .arg(
             Arg::new("verbosity")
                 .short('v')
-                .multiple_occurrences(true)
+                .action(ArgAction::Count)
                 .help("Sets the log level. Default: INFO. -v = DEBUG, -vv = TRACE"),
         )
         .subcommand(
@@ -47,8 +47,9 @@ fn args() -> Command<'static> {
                 .arg(
                     Arg::new("config")
                         .help("Provides the path to the server configuration file.")
+                        .action(ArgAction::Set)
                         .required(true)
-                        .takes_value(true)
+                        .value_name("CONFIG")
                         .index(1),
                 ),
         )
@@ -69,7 +70,7 @@ pub(crate) fn load() -> Result<AppConfig> {
     let log_config = ConfigBuilder::new().set_time_format_rfc3339().build();
 
     // After this block logging is configured at the specified level
-    match matches.occurrences_of("verbosity") {
+    match matches.get_count("verbosity") {
         0 => SimpleLogger::init(log::LevelFilter::Info, log_config)
             .context("failed to initialize logger at level - INFO")?,
         1 => SimpleLogger::init(log::LevelFilter::Debug, log_config)
@@ -106,7 +107,7 @@ pub(crate) fn load() -> Result<AppConfig> {
 }
 
 fn runner_config(m: &ArgMatches) -> Result<AppConfig> {
-    if let Some(value) = m.value_of("config") {
+    if let Some(value) = m.get_one::<String>("config") {
 	AppConfig::from_path(value)
     } else {
         let msg = "Failed to read arguments for 'run' subcommand".to_owned();
