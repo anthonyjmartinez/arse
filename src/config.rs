@@ -252,17 +252,17 @@ impl AppConfig {
         let docpaths = DocPaths::new(&dir);
         let site = Site::new_from_input(reader)?;
         let server = Server::new();
-	let mime_types: HashMap<String, String> = HashMap::from([
-	    ("css".into(), "text/css".into()),
-	    ("gif".into(), "image/gif".into()),
-	    ("jpg".into(), "image/jpeg".into()),
-	]);
+	    let mime_types: HashMap<String, String> = HashMap::from([
+            ("css".into(), "text/css".into()),
+            ("gif".into(), "image/gif".into()),
+            ("jpg".into(), "image/jpeg".into()),
+        ]);
 
         let config = AppConfig {
             site,
             server,
             docpaths,
-	    mime_types,
+	        mime_types,
         };
 
         config
