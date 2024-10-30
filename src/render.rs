@@ -12,7 +12,6 @@ copied, modified, or distributed except according to those terms.
 
 use tokio::fs::File;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
 
 use super::common;
 use super::config::AppConfig;
@@ -33,19 +32,21 @@ mod default;
 /// all rendering and serving tasks are executed.
 #[derive(Debug)]
 pub(crate) struct Engine {
-    pub app: Arc<AppConfig>,
+    pub app: AppConfig,
     pub instance: Tera,
+	pub topic_slugs: Vec<String>,
 }
 
 impl Engine {
     /// Creates a new [`Engine`] from a given [`AppConfig`].
-    pub(crate) fn new(app: Arc<AppConfig>) -> Engine {
+    pub(crate) fn new(app: AppConfig) -> Engine {
 	trace!("Loading rendering engine");
-	let instance = Self::load_template(app.clone()).unwrap();
-	Engine { app, instance }
+	let instance = Self::load_template(&app).unwrap();
+	let topic_slugs: Vec<String> = app.site.topics.iter().map(|t| common::slugify(t)).collect();
+	Engine { app, instance, topic_slugs }
     }
 
-    fn load_template(app: Arc<AppConfig>) -> Result<Tera> {
+    fn load_template(app: &AppConfig) -> Result<Tera> {
 	trace!("Loading Tera rendering template");
 	let mut tera = Tera::default();
 	let template = app.site.template.as_str();
@@ -261,8 +262,7 @@ mod tests {
 	let mut src: &[u8] =
 	    b"Site Name\nAuthor Name\nhttps://special.example.site\nOne, Gallery\nadmin\n";
 	let config = AppConfig::generate(&dir, &mut src).unwrap();
-	let config = Arc::new(config);
-	let tera = Engine::load_template(config);
+	let tera = Engine::load_template(&config);
 	assert!(tera.is_ok())
     }
 
@@ -272,7 +272,6 @@ mod tests {
 	let mut src: &[u8] =
 	    b"Site Name\nAuthor Name\nhttps://special.example.site\nOne, Gallery\nadmin\n";
 	let config = AppConfig::generate(&dir, &mut src).unwrap();
-	let config = Arc::new(config);
 	let engine = Engine::new(config);
 
 	let post = r#"
@@ -305,7 +304,6 @@ Super Wow!
 	let mut src: &[u8] =
 	    b"Site Name\nAuthor Name\nhttps://special.example.site\nOne, Gallery\nadmin\n";
 	let config = AppConfig::generate(&dir, &mut src).unwrap();
-	let config = Arc::new(config);
 	let engine = Engine::new(config);
 
 	let post = r#"
@@ -337,7 +335,6 @@ Super Wow!
 	let mut src: &[u8] =
 	    b"Site Name\nAuthor Name\nhttps://special.example.site\nOne, Gallery\nadmin\n";
 	let config = AppConfig::generate(&dir, &mut src).unwrap();
-	let config = Arc::new(config);
 	let engine = Engine::new(config);
 
 	let page = engine.render_topic("one").await.unwrap();
@@ -351,7 +348,6 @@ Super Wow!
 	let mut src: &[u8] =
 	    b"Site Name\nAuthor Name\nhttps://special.example.site\nOne, Gallery\nadmin\n";
 	let config = AppConfig::generate(&dir, &mut src).unwrap();
-	let config = Arc::new(config);
 	let engine = Engine::new(config);
 
 	let fake_img = "some bytes";
@@ -373,7 +369,6 @@ Super Wow!
 	let mut src: &[u8] =
 	    b"Site Name\nAuthor Name\nhttps://special.example.site\nOne, Gallery\nadmin\n";
 	let config = AppConfig::generate(&dir, &mut src).unwrap();
-	let config = Arc::new(config);
 	let engine = Engine::new(config);
 
 	let page = engine.render_topic("gallery").await.unwrap();
@@ -387,7 +382,6 @@ Super Wow!
 	let mut src: &[u8] =
 	    b"Site Name\nAuthor Name\nhttps://special.example.site\nOne, Gallery\nadmin\n";
 	let config = AppConfig::generate(&dir, &mut src).unwrap();
-	let config = Arc::new(config);
 	let engine = Engine::new(config);
 
 	let main_post = r#"
