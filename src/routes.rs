@@ -12,33 +12,43 @@ copied, modified, or distributed except according to those terms.
 
 use std::collections::HashMap;
 use std::ffi::OsStr;
+use anyhow::anyhow;
 use tokio::fs::File;
 use tokio::io::AsyncReadExt;
 use std::path::Path;
 use std::sync::Arc;
 
-use hyper::{Body, Request, Response, StatusCode};
+use axum::{
+	body::Body,
+	extract::{Path as axumPath, State},
+	http::StatusCode,
+	response::Response,
+	routing::get,
+	Router
+};
 use log::{debug, error, info};
-use routerify::{prelude::*, RouteError, Router};
+
+use crate::common::slugify;
 
 use super::render::Engine;
 use super::{Context, Error, Result};
 
-/// Creates a [`Router<Body, Error>`] instance with a given [`Arc<Engine>`].
-pub(crate) fn router(engine: Arc<Engine>) -> Router<Body, Error> {
+/// Creates a [`Filter`] instance with a given [`Arc<Engine>`].
+pub(crate) fn router(engine: Arc<Engine>) -> Router {
     debug!("Building site router");
-    Router::builder()
-	.data(engine)
-	.get("/static/:fname", static_assets)
-	.get("/favicon.ico", favicon)
-	.get("/rss.xml", rss_handler)
-	.get("/:topic", topic_handler)
-	.get("/:topic/ext/:fname", topic_assets)
-	.get("/:topic/posts/:post", post_handler)
-	.get("/", index_handler)
-	.err_handler(error_handler)
-	.build()
-	.unwrap()
+	let router = Router::new()
+		.route("/", get(index_handler))
+		.route("/favicon.ico", get(favicon))
+		.route("/rss.xml", get(rss_handler))
+		.route("/static/*fname", get(static_assets))
+		.route("/:topic/ext/*fname", get(topic_assets))
+		.route("/:topic/posts/:post", get(post_handler))
+		.route("/:topic", get(topic_handler))
+		.with_state(engine);
+
+	router
+	
+
 }
 
 /// Returns the MIME type given by the user's config for a particular extension.
@@ -47,60 +57,63 @@ pub(crate) fn router(engine: Arc<Engine>) -> Router<Body, Error> {
 /// is not capable of being rendered as plaintext.
 fn mime_from_ext(ext: Option<&OsStr>, mime_map: &HashMap<String, String>) -> String {
     if let Some(e) = ext {
-	let e_string = e.to_str().unwrap_or_default();
-	if let Some(m) = mime_map.get(e_string) {
-	    return m.clone()
-	}
+		let e_string = e.to_str().unwrap_or_default();
+		if let Some(m) = mime_map.get(e_string) {
+	   	 return m.clone()
+		}
     }
 
     String::from("text/plain")
 }
 
-/// Handles errors from either bad requests or server errors
-pub(crate) async fn error_handler(err: RouteError) -> Response<Body> {
-    error!("{}", err);
-
-    Response::builder()
-	.status(StatusCode::NOT_FOUND)
-	.header("content-type", "text/plain")
-	.body(Body::from("Not Found"))
-	.unwrap()
-}
-
 /// Handler for "/"
-async fn index_handler(req: Request<Body>) -> Result<Response<Body>> {
+async fn index_handler(State(engine): State<Arc<Engine>>) -> Response<Body> {
     info!("Handling request to '/'");
-    let engine = req.data::<Arc<Engine>>().unwrap();
     topic_posts(engine.clone(), "main".to_owned()).await
+		.unwrap_or_else(|err| server_error(StatusCode::INTERNAL_SERVER_ERROR, err))
 }
 
 /// Handler for "/rss"
-async fn rss_handler(req: Request<Body>) -> Result<Response<Body>> {
-    let engine = req.data::<Arc<Engine>>().unwrap();
+async fn rss_handler(State(engine): State<Arc<Engine>>) -> Response<Body> {
     info!("Handling request to '/rss.xml'");
-    let rss = engine.rss().await?;
-
-    let response = Response::builder()
-	.header("content-type", "application/rss+xml")
-	.body(Body::from(rss))?;
-
-    Ok(response)
+	match engine.rss().await {
+		Ok(rss) => {
+			Response::builder()
+				.header("content-type", "application/rss+xml")
+				.body(Body::from(rss))
+				.unwrap()
+		},
+		Err(err) => {
+			server_error(StatusCode::INTERNAL_SERVER_ERROR, err)
+		}
+	}
 }
 
 /// Handler for "/:topic"
-async fn topic_handler(req: Request<Body>) -> Result<Response<Body>> {
-    let engine = req.data::<Arc<Engine>>().unwrap();
-    let topic = req.param("topic").unwrap();
+async fn topic_handler(axumPath(topic): axumPath<String>, State(engine): State<Arc<Engine>>) -> Response<Body> {
     info!("Handling request to '/{}'", &topic);
-    topic_posts(engine.clone(), topic.to_owned()).await
+	let topic_slug = slugify(&topic);
+	if !engine.topic_slugs.contains(&topic_slug) {
+		return server_error(
+			StatusCode::NOT_FOUND,
+			anyhow!("Topic: {} was not found", topic)
+		)
+	}
+
+	topic_posts(engine.clone(), topic_slug)
+		.await
+		.unwrap_or_else(|err| {
+			println!("wtf {err}");
+			server_error(StatusCode::INTERNAL_SERVER_ERROR, err)
+		})
 }
 
 /// Called by topic_handler to dynamically generate topic pages
-async fn topic_posts(engine: Arc<Engine>, topic: String) -> Result<Response<Body>> {
+async fn topic_posts(engine: Arc<Engine>, topic_slug: String) -> Result<Response<Body>> {
     let output = engine
-	.render_topic(&topic)
+	.render_topic(&topic_slug)
 	.await
-	.with_context(|| format!("failed to render topic: {}", &topic))?;
+	.with_context(|| format!("failed to render topic: {}", &topic_slug))?;
 
     let response = Response::builder()
 	.header("content-type", "text-html")
@@ -108,111 +121,155 @@ async fn topic_posts(engine: Arc<Engine>, topic: String) -> Result<Response<Body
     Ok(response)
 }
 
-/// Handler for "/static/:fname"
-async fn static_assets(req: Request<Body>) -> Result<Response<Body>> {
-    let engine = req.data::<Arc<Engine>>().unwrap();
-    let resource = req.param("fname").unwrap();
-    info!("Handling static asset: '/static/{}'", &resource);
-    let static_path = Path::new(&engine.app.docpaths.webroot)
+/// Handler for "/static/*fname"
+async fn static_assets(
+	axumPath(fname): axumPath<String>,
+	State(engine): State<Arc<Engine>>
+) -> Response<Body> {
+    info!("Handling static asset: '/static/{}'", &fname);
+	if fname.split("/").collect::<Vec<&str>>().iter().any(|x| x.eq(&".") || x.eq(&"..")) {
+		return server_error(StatusCode::FORBIDDEN, anyhow!("Attempted use of . or .. paths"))
+	}
+
+	let static_path = Path::new(&engine.app.docpaths.webroot)
 	.join("static")
-	.join(resource);
-    let mut f = File::open(&static_path)
-	.await
-	.with_context(|| format!("failed to open '{}'", &static_path.display()))?;
-    let mut buf = Vec::new();
-    f.read_to_end(&mut buf)
-	.await
-	.context("failed to read to buffer")?;
-
-    let response = Response::builder()
-	.header("content-type", mime_from_ext(static_path.extension(), &engine.app.mime_types))
-	.body(Body::from(buf))?;
-
-    Ok(response)
+	.join(fname);
+    match File::open(&static_path).await
+		.with_context(|| format!("failed to open '{}'", &static_path.display())) {
+			Ok(mut f) => {
+				let mut buf = Vec::new();
+				match f.read_to_end(&mut buf).await.context("failed to read buffer") {
+					Ok(_) => {
+						Response::builder()
+							.header("content-type", mime_from_ext(static_path.extension(), &engine.app.mime_types))
+							.body(Body::from(buf))
+							.unwrap_or_else(|err| server_error(StatusCode::INTERNAL_SERVER_ERROR, err.into()))
+					},
+					Err(err) => server_error(StatusCode::INTERNAL_SERVER_ERROR, err) 
+				}
+			},
+			Err(err) => server_error(StatusCode::NOT_FOUND, err)
+ 	}
 }
 
 /// Handler for "/favicon.ico"
-async fn favicon(req: Request<Body>) -> Result<Response<Body>> {
-    let engine = req.data::<Arc<Engine>>().unwrap();
+async fn favicon(State(engine): State<Arc<Engine>>) -> Response<Body> {
     info!("Handling favicon request");
     let favicon_path = Path::new(&engine.app.docpaths.webroot)
 	.join("static")
 	.join("favicon.ico");
-    let mut f = File::open(&favicon_path)
-	.await
-	.with_context(|| format!("failed to open '{}'", &favicon_path.display()))?;
-    let mut buf = Vec::new();
-    f.read_to_end(&mut buf)
-	.await
-	.context("failed to read to buffer")?;
-
-    let response = Response::builder()
-	.header("content-type", "image/vnd.microsoft.icon")
-	.body(Body::from(buf))?;
-    Ok(response)
+    match File::open(&favicon_path).await {
+		Ok(mut f) => {
+			let mut buf = Vec::new();
+			match f.read_to_end(&mut buf).await {
+				Ok(_) => {
+					Response::builder()
+						.header("content-type", "image/vnd.microsoft.icon")
+						.body(Body::from(buf))
+						.unwrap_or_else(|err| server_error(StatusCode::INTERNAL_SERVER_ERROR, err.into()))
+				},
+				Err(err) => server_error(StatusCode::INTERNAL_SERVER_ERROR, err.into())
+			}
+		},
+		Err(err) => server_error(StatusCode::INTERNAL_SERVER_ERROR, err.into())
+	}
 }
 
-/// Handler for "/:topic/ext/:fname"
-async fn topic_assets(req: Request<Body>) -> Result<Response<Body>> {
-    let engine = req.data::<Arc<Engine>>().unwrap();
-    let topic = req.param("topic").unwrap();
-    let resource = req.param("fname").unwrap();
-    info!("Handling static asset: '/{}/ext/{}'", &topic, &resource);
+/// Handler for "/:topic/ext/*fname"
+async fn topic_assets(
+	axumPath((topic, fname)): axumPath<(String, String)>,
+	State(engine): State<Arc<Engine>>
+) -> Response<Body> {
+	info!("Handling static asset: '/{}/ext/{}'", &topic, &fname);
+	let topic_slug = slugify(&topic);
+	if !engine.topic_slugs.contains(&topic_slug) {
+		return server_error(
+			StatusCode::NOT_FOUND,
+			anyhow!("Topic: {} was not found", topic)
+		)
+	}
+
+	if fname.split("/").collect::<Vec<&str>>().iter().any(|x| x.eq(&".") || x.eq(&"..")) {
+		return server_error(StatusCode::FORBIDDEN, anyhow!("Attempted use of . or .. paths"))
+	}
+ 
     let topic_asset_path = Path::new(&engine.app.docpaths.webroot)
 	.join(topic)
 	.join("ext")
-	.join(resource);
-    let mut f = File::open(&topic_asset_path)
-	.await
-	.with_context(|| format!("failed to open '{}'", &topic_asset_path.display()))?;
-    let mut buf = Vec::new();
-    f.read_to_end(&mut buf)
-	.await
-	.context("failed to read to buffer")?;
+	.join(fname);
 
-    let response = Response::builder()
-	.header("content-type", mime_from_ext(topic_asset_path.extension(), &engine.app.mime_types))
-	.body(Body::from(buf))?;
-
-    Ok(response)
+    match File::open(&topic_asset_path)
+	.await
+	.with_context(|| format!("failed to open '{}'", &topic_asset_path.display())) {
+		Ok(mut f) => {
+			let mut buf = Vec::new();
+			match f.read_to_end(&mut buf).await.context("failed to read buffer") {
+				Ok(_) => {
+					Response::builder()
+						.header("content-type", mime_from_ext(topic_asset_path.extension(), &engine.app.mime_types))
+						.body(Body::from(buf))
+						.unwrap_or_else(|err| server_error(StatusCode::INTERNAL_SERVER_ERROR, err.into()))
+				},
+				Err(err) => {
+					server_error(StatusCode::INTERNAL_SERVER_ERROR, err)
+				}
+			}
+		},
+		Err(err) => {
+			server_error(StatusCode::NOT_FOUND, err)
+		}
+	}
 }
 
-/// Handler for "/:topic/:post"
-async fn post_handler(req: Request<Body>) -> Result<Response<Body>> {
-    let engine = req.data::<Arc<Engine>>().unwrap();
-    let topic = req.param("topic").unwrap();
-    let post = req.param("post").unwrap();
+/// Handler for "/:topic/posts/:post"
+async fn post_handler(
+	axumPath((topic, post)): axumPath<(String, String)>,
+	State(engine): State<Arc<Engine>>
+) -> Response<Body> {
     info!("Handling topic post: '/{}/posts/{}'", &topic, &post);
-    let output = engine
-	.render_post(topic, post)
-	.await
-	.with_context(|| format!("failed to render: '{}/posts/{}'", topic, post))?;
+    match engine
+		.render_post(&slugify(&topic), &post).await
+		.with_context(|| format!("failed to render: '{}/posts/{}'", topic, post)) {
+			Ok(output) => {
+				Response::builder()
+					.header("content-type", "text/html")
+					.body(Body::from(output))
+					.unwrap_or_else(|err| {
+						server_error(StatusCode::INTERNAL_SERVER_ERROR, err.into())
+					})				
+			},
+			Err(err) => {
+				server_error(StatusCode::NOT_FOUND, err)
+			}
+	}
+}
 
-    let response = Response::builder()
-	.header("content-type", "text/html")
-	.body(Body::from(output))?;
-
-    Ok(response)
+/// Builds server error responses and logs originating error
+fn server_error(code: StatusCode, err: Error) -> Response<Body> {
+	error!("Server error: {err}");
+	Response::builder()
+		.status(code)
+		.body(Body::default())
+		.unwrap()
 }
 
 #[cfg(test)]
 mod tests {
     use std::fs::File;
     use std::io::prelude::*;
-    use std::net::SocketAddr;
 
     use super::*;
     use crate::config::AppConfig;
-    use hyper::{Body, Client, Request, Server, StatusCode};
-    use routerify::RouterService;
+    use hyper::StatusCode;
     use tokio::sync::oneshot::channel;
+	use reqwest::Client;
 
     #[tokio::test]
     async fn check_all_handlers() {
 	let dir = tempfile::tempdir().unwrap();
 	let mut src: &[u8] = b"Site Name\nAuthor Name\nhttps://some.special.site\nOne, Two, Three, And More\nadmin\n";
 	let app = AppConfig::generate(&dir, &mut src).unwrap();
-	let engine = Engine::new(Arc::new(app));
+	let engine = Engine::new(app);
 	let engine = Arc::new(engine);
 
 	let index_page = r#"
@@ -247,74 +304,11 @@ One Important Test
 	f.write_all(favicon).unwrap();
 
 	let router = router(engine.clone());
-
-	let index_request = Request::builder()
-	    .method("GET")
-	    .uri("http://localhost:9090")
-	    .body(Body::default())
-	    .unwrap();
-
-	let post_request = Request::builder()
-	    .method("GET")
-	    .uri("http://localhost:9090/one/posts/index")
-	    .body(Body::default())
-	    .unwrap();
-
-	let topic_request = Request::builder()
-	    .method("GET")
-	    .uri("http://localhost:9090/one")
-	    .body(Body::default())
-	    .unwrap();
-
-	let topic_asset_request = Request::builder()
-	    .method("GET")
-	    .uri("http://localhost:9090/one/ext/one-static")
-	    .body(Body::default())
-	    .unwrap();
-
-	let static_asset_request = Request::builder()
-	    .method("GET")
-	    .uri("http://localhost:9090/static/main-static")
-	    .body(Body::default())
-	    .unwrap();
-
-	let favicon_request = Request::builder()
-	    .method("GET")
-	    .uri("http://localhost:9090/favicon.ico")
-	    .body(Body::default())
-	    .unwrap();
-
-	let bad_topic_request = Request::builder()
-	    .method("GET")
-	    .uri("http://localhost:9090/badtopic")
-	    .body(Body::default())
-	    .unwrap();
-
-	let bad_post_request = Request::builder()
-	    .method("GET")
-	    .uri("http://localhost:9090/one/posts/nope")
-	    .body(Body::default())
-	    .unwrap();
-
-	let bad_static_request = Request::builder()
-	    .method("GET")
-	    .uri("http://localhost:9090/static/nope")
-	    .body(Body::default())
-	    .unwrap();
-
-	let rss_request = Request::builder()
-	    .method("GET")
-	    .uri("http://localhost:9090/rss.xml")
-	    .body(Body::default())
-	    .unwrap();
-
-	let service = RouterService::new(router).unwrap();
 	let addr = format!("{}:{}", engine.app.server.bind, engine.app.server.port);
-	let addr: SocketAddr = addr.parse().unwrap();
+	let listener = tokio::net::TcpListener::bind(&addr).await.unwrap();
+	let server = axum::serve(listener, router);
 
 	let (tx, rx) = channel::<()>();
-
-	let server = Server::bind(&addr).serve(service);
 
 	let graceful = server.with_graceful_shutdown(async {
 	    rx.await.ok();
@@ -326,15 +320,26 @@ One Important Test
 	    }
 	});
 
+	let index_request_url = "http://localhost:9090";
+	let post_request_url = "http://localhost:9090/one/posts/index";
+	let topic_request_url = "http://localhost:9090/one";
+	let topic_asset_request_url = "http://localhost:9090/one/ext/one-static";
+	let static_asset_request_url = "http://localhost:9090/static/main-static";
+	let favicon_request_url = "http://localhost:9090/favicon.ico";
+	let bad_topic_request_url = "http://localhost:9090/badtopic";
+	let bad_post_request_url = "http://localhost:9090/one/posts/nope";
+	let bad_static_request_url = "http://localhost:9090/static/nope";
+	let rss_request_url = "http://localhost:9090/rss.xml";
+
 	let client = Client::new();
 
-	let index_resp = client.request(index_request).await.unwrap();
-	let post_resp = client.request(post_request).await.unwrap();
-	let topic_resp = client.request(topic_request).await.unwrap();
-	let topic_asset_resp = client.request(topic_asset_request).await.unwrap();
-	let static_asset_resp = client.request(static_asset_request).await.unwrap();
-	let favicon_resp = client.request(favicon_request).await.unwrap();
-	let rss_resp = client.request(rss_request).await.unwrap();
+	let index_resp = client.get(index_request_url).send().await.unwrap();
+	let post_resp = client.get(post_request_url).send().await.unwrap();
+	let topic_resp = client.get(topic_request_url).send().await.unwrap();
+	let topic_asset_resp = client.get(topic_asset_request_url).send().await.unwrap();
+	let static_asset_resp = client.get(static_asset_request_url).send().await.unwrap();
+	let favicon_resp = client.get(favicon_request_url).send().await.unwrap();
+	let rss_resp = client.get(rss_request_url).send().await.unwrap();
 	assert_eq!(index_resp.status(), StatusCode::OK);
 	assert_eq!(post_resp.status(), StatusCode::OK);
 	assert_eq!(topic_resp.status(), StatusCode::OK);
@@ -343,9 +348,9 @@ One Important Test
 	assert_eq!(favicon_resp.status(), StatusCode::OK);
 	assert_eq!(rss_resp.status(), StatusCode::OK);
 
-	let bad_topic_resp = client.request(bad_topic_request).await.unwrap();
-	let bad_post_resp = client.request(bad_post_request).await.unwrap();
-	let bad_static_resp = client.request(bad_static_request).await.unwrap();
+	let bad_topic_resp = client.get(bad_topic_request_url).send().await.unwrap();
+	let bad_post_resp = client.get(bad_post_request_url).send().await.unwrap();
+	let bad_static_resp = client.get(bad_static_request_url).send().await.unwrap();
 	assert_eq!(bad_topic_resp.status(), StatusCode::NOT_FOUND);
 	assert_eq!(bad_post_resp.status(), StatusCode::NOT_FOUND);
 	assert_eq!(bad_static_resp.status(), StatusCode::NOT_FOUND);
@@ -356,48 +361,23 @@ One Important Test
     #[tokio::test]
     async fn check_custom_config() {
 	let app = AppConfig::from_path("test_files/test-config.toml").unwrap();
-	let engine = Engine::new(Arc::new(app));
+	let engine = Engine::new(app);
 	let engine = Arc::new(engine);
 
 	let router = router(engine.clone());
 
-	let index_request = Request::builder()
-	    .method("GET")
-	    .uri("http://localhost:8901")
-	    .body(Body::default())
-	    .unwrap();
+	let index_request_url = "http://localhost:8901";
+	let post_request_url = "http://localhost:8901/one/posts/1";
+	let topic_request_url = "http://localhost:8901/one";
+	let gallery_request_url = "http://localhost:8901/gallery";
+	let rss_request_url = "http://localhost:8901/rss.xml";
 
-	let post_request = Request::builder()
-	    .method("GET")
-	    .uri("http://localhost:8901/one/posts/1")
-	    .body(Body::default())
-	    .unwrap();
-
-	let topic_request = Request::builder()
-	    .method("GET")
-	    .uri("http://localhost:8901/one")
-	    .body(Body::default())
-	    .unwrap();
-
-	let gallery_request = Request::builder()
-	    .method("GET")
-	    .uri("http://localhost:8901/gallery")
-	    .body(Body::default())
-	    .unwrap();
-
-	let rss_request = Request::builder()
-	    .method("GET")
-	    .uri("http://localhost:8901/rss.xml")
-	    .body(Body::default())
-	    .unwrap();
-
-	let service = RouterService::new(router).unwrap();
+	
 	let addr = format!("{}:{}", engine.app.server.bind, engine.app.server.port);
-	let addr: SocketAddr = addr.parse().unwrap();
+	let listener = tokio::net::TcpListener::bind(&addr).await.unwrap();
+	let server = axum::serve(listener, router);
 
 	let (tx, rx) = channel::<()>();
-
-	let server = Server::bind(&addr).serve(service);
 
 	let graceful = server.with_graceful_shutdown(async {
 	    rx.await.ok();
@@ -411,11 +391,11 @@ One Important Test
 
 	let client = Client::new();
 
-	let index_resp = client.request(index_request).await.unwrap();
-	let post_resp = client.request(post_request).await.unwrap();
-	let topic_resp = client.request(topic_request).await.unwrap();
-	let gallery_resp = client.request(gallery_request).await.unwrap();
-	let rss_resp = client.request(rss_request).await.unwrap();
+	let index_resp = client.get(index_request_url).send().await.unwrap();
+	let post_resp = client.get(post_request_url).send().await.unwrap();
+	let topic_resp = client.get(topic_request_url).send().await.unwrap();
+	let gallery_resp = client.get(gallery_request_url).send().await.unwrap();
+	let rss_resp = client.get(rss_request_url).send().await.unwrap();
 	assert_eq!(index_resp.status(), StatusCode::OK);
 	assert_eq!(post_resp.status(), StatusCode::OK);
 	assert_eq!(topic_resp.status(), StatusCode::OK);
