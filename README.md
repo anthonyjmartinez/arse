@@ -5,7 +5,7 @@ and flexible base for serving sites using:
 
 * [Tera](https://tera.netlify.app/) for templates
 * [pulldown-cmark](https://crates.io/crates/pulldown-cmark) for CommonMark rendering
-* [routerify](https://crates.io/crates/routerify) to serve the site
+* [axum](https://crates.io/crates/axum) to serve the site
 * [simplecss](https://simplecss.org) for default styling
 * [rss](https://crates.io/crates/rss) for generating a full-site RSS feed
 
