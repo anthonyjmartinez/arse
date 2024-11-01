@@ -116,7 +116,7 @@ async fn topic_posts(engine: Arc<Engine>, topic_slug: String) -> Result<Response
 	.with_context(|| format!("failed to render topic: {}", &topic_slug))?;
 
     let response = Response::builder()
-	.header("content-type", "text-html")
+	.header("content-type", "text/html")
 	.body(Body::from(output))?;
     Ok(response)
 }
