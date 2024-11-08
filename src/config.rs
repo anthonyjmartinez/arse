@@ -42,16 +42,14 @@ fn args() -> Command {
                 .help("Sets the log level. Default: INFO. -v = DEBUG, -vv = TRACE"),
         )
         .subcommand(
-            Command::new("run")
-                .about("Run the site server")
-                .arg(
-                    Arg::new("config")
-                        .help("Provides the path to the server configuration file.")
-                        .action(ArgAction::Set)
-                        .required(true)
-                        .value_name("CONFIG")
-                        .index(1),
-                ),
+            Command::new("run").about("Run the site server").arg(
+                Arg::new("config")
+                    .help("Provides the path to the server configuration file.")
+                    .action(ArgAction::Set)
+                    .required(true)
+                    .value_name("CONFIG")
+                    .index(1),
+            ),
         )
         .subcommand(
             Command::new("new").about(
@@ -83,24 +81,24 @@ pub(crate) fn load() -> Result<AppConfig> {
 
     debug!("Processing subcommands");
     let config: Result<AppConfig> = match matches.subcommand() {
-	Some(("run", run_m)) => {
+        Some(("run", run_m)) => {
             trace!("Application called with `run` subcommand - loading config from disk");
-	    runner_config(run_m)
-	},
-	Some(("new", _)) => {
+            runner_config(run_m)
+        }
+        Some(("new", _)) => {
             trace!("Application called with `new` subcommand - creating config from user input");
             let reader = std::io::stdin();
             let mut reader = reader.lock();
             let current_path =
-		std::env::current_dir().context("failed to get current working directory")?;
+                std::env::current_dir().context("failed to get current working directory")?;
             let _ = AppConfig::generate(current_path, &mut reader);
             std::process::exit(0);
-	},
-	_ => {
+        }
+        _ => {
             let msg = "Unable to load configuration".to_owned();
             error!("{}", &msg);
             Err(anyhow!("{}", msg))
-	}
+        }
     };
 
     config
@@ -108,7 +106,7 @@ pub(crate) fn load() -> Result<AppConfig> {
 
 fn runner_config(m: &ArgMatches) -> Result<AppConfig> {
     if let Some(value) = m.get_one::<String>("config") {
-	AppConfig::from_path(value)
+        AppConfig::from_path(value)
     } else {
         let msg = "Failed to read arguments for 'run' subcommand".to_owned();
         error!("{}", &msg);
@@ -215,7 +213,6 @@ impl DocPaths {
     }
 }
 
-
 /// Provides the overall application configuration used by the server and rendering engine.
 #[derive(Debug, Deserialize, Serialize, PartialEq)]
 pub(crate) struct AppConfig {
@@ -252,7 +249,7 @@ impl AppConfig {
         let docpaths = DocPaths::new(&dir);
         let site = Site::new_from_input(reader)?;
         let server = Server::new();
-	    let mime_types: HashMap<String, String> = HashMap::from([
+        let mime_types: HashMap<String, String> = HashMap::from([
             ("css".into(), "text/css".into()),
             ("gif".into(), "image/gif".into()),
             ("jpg".into(), "image/jpeg".into()),
@@ -262,7 +259,7 @@ impl AppConfig {
             site,
             server,
             docpaths,
-	        mime_types,
+            mime_types,
         };
 
         config
@@ -309,10 +306,10 @@ mod tests {
     fn build_run_config() {
         let arg_vec = vec!["arse", "run", "./test_files/test-config.toml"];
         let matches = args().get_matches_from(arg_vec);
-	if let Some(run_m) = matches.subcommand_matches("run") {
-	    let config = runner_config(run_m);
+        if let Some(run_m) = matches.subcommand_matches("run") {
+            let config = runner_config(run_m);
             assert!(config.is_ok());
-	}
+        }
     }
 
     #[test]
