@@ -25,7 +25,7 @@ pub(crate) const TEMPLATE: &str = r#"
 <a href="/">Home</a>
 {%- for topic in site.topics %}
 <a href="/{{ topic | slugify }}">{{ topic }}</a>
-{%- endfor -%}
+{%- endfor %}
 <a href="/rss.xml">RSS</a>
 </nav>
 </header>
