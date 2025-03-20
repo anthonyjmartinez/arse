@@ -72,21 +72,21 @@ at runtime.
 The following elements are available within the Tera context for rendering:
 
 * `site`, mapping directly to the fields available in the `site` configuration section
-* `post`, available when serving single-posts from from `site/:topic/posts/:post.md`
-  * Used when serving `GET /:topic/posts/:post` where `:post` is the markdown filename minus its extension
-* `posts`, a lexically reverse-sorted list of HTML rendered from markdown in `site/:topic/posts/*.md`
-  * Used when serving `GET /:topic`
+* `post`, available when serving single-posts from from `site/{topic}/posts/{post}.md`
+  * Used when serving `GET /{topic}/posts/{post}` where `{post}` is the markdown filename minus its extension
+* `posts`, a lexically reverse-sorted list of HTML rendered from markdown in `site/{topic}/posts/{*}.md`
+  * Used when serving `GET /{topic}`
 
 #### Further Customizations
 
 * `bind` and `port` may be set in the `[server]` section.
 * New topics are added as array elements
-  * For each new topic, create the necessary paths `site/:topic/posts` and `site/:topic/ext`
+  * For each new topic, create the necessary paths `site/{topic}/posts` and `site/{topic}/ext`
 * Items in `[docpaths]` are generated as full paths for completeness, however relative paths will work if desired
   * From the example above the user is free to simply use `site/templates` and `site/webroot` and move the directory out of `/home/user`
   * Note that `arse new` creates the site tree, and all other output files, in the current working directory.
 * If `gallery` is one of the topics requested
-  * A simple image slideshow will be generated for `/gallery/ext/*.jpg`
+  * A simple image slideshow will be generated for `/gallery/ext/{*}.jpg`
   * Display will follow the same lexical reverse order as posts.
 
 #### MIME types
@@ -95,7 +95,7 @@ Version `0.16.0` added a `mime_types` section to the `config.toml` file. This is
 mappings from a file extension to the desired MIME type. These mappings are used when serving files from:
 
 - `static/`
-- `:topic/ext/`
+- `{topic}/ext/`
 
 If there is no match for the extension, or the file lacks an extension entirely, the default is `text/plain`.
 As such, if you wish for maximimum compatibility with different reverse proxies, browsers, or other applications
