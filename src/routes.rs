@@ -40,10 +40,10 @@ pub(crate) fn router(engine: Arc<Engine>) -> Router {
         .route("/", get(index_handler))
         .route("/favicon.ico", get(favicon))
         .route("/rss.xml", get(rss_handler))
-        .route("/static/*fname", get(static_assets))
-        .route("/:topic/ext/*fname", get(topic_assets))
-        .route("/:topic/posts/:post", get(post_handler))
-        .route("/:topic", get(topic_handler))
+        .route("/static/{*fname}", get(static_assets))
+        .route("/{topic}/ext/{*fname}", get(topic_assets))
+        .route("/{topic}/posts/{post}", get(post_handler))
+        .route("/{topic}", get(topic_handler))
         .with_state(engine);
 
     router
